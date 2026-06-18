@@ -14,8 +14,8 @@ THREADS · 2
       ↳ alice  Good catch, fixing.
 
   [2] b.ts:10  src  (resolved, outdated)
-      lint-bot[bot] (bot)  nit: prefer const here for the long explanation that should be truncated
-                           in the compact view
+      lint-bot[bot] (bot)  nit: prefer const here for the long explanation that should be
+                           truncated in the compact view
 
 CONVERSATION
   carol  LGTM overall once threads are addressed.

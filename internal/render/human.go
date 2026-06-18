@@ -44,11 +44,20 @@ func newStyles(w io.Writer) styles {
 }
 
 // Comments renders the PR review state, assuming pr is already filtered.
+// rightGutter is a small margin kept clear of the terminal's right edge. It
+// avoids last-column auto-wrap and absorbs width-estimation slop for
+// ambiguous-width glyphs (e.g. "↳"), which some terminals render two columns
+// wide while runewidth counts them as one.
+const rightGutter = 2
+
 func Comments(w io.Writer, pr *model.PR, opts Options) {
 	s := newStyles(w)
 	width := opts.Width
 	if width <= 0 {
-		width = contentWidth(w)
+		width = contentWidth(w) - rightGutter
+	}
+	if width < 20 {
+		width = 20
 	}
 
 	// Header + BLUF status line.
