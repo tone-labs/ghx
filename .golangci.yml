@@ -1,3 +1,12 @@
 version: "2"
 linters:
   default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  settings:
+    errcheck:
+      # Writes to stdout/stderr in the CLI printers are fire-and-forget;
+      # a broken stdout isn't actionable from a render function.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Writer).Write
