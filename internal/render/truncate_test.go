@@ -1,35 +1,45 @@
 package render
 
-import "testing"
-
-func TestTruncate(t *testing.T) {
-	cases := []struct {
-		name        string
-		body        string
-		width       int
-		wantText    string
-		wantOmitted int
-	}{
-		{"under width", "hello world", 20, "hello world", 0},
-		{"flatten newlines", "line one\n\n  line two", 50, "line one line two", 0},
-		{"exact boundary", "abcde", 5, "abcde", 0},
-		{"over width", "abcdefghij", 5, "abcde…", 5},
-		{"no limit", "a long body here", 0, "a long body here", 0},
-		{"multibyte counts runes", "héllo wörld", 5, "héllo…", 6},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			text, omitted := truncate(c.body, c.width)
-			if text != c.wantText || omitted != c.wantOmitted {
-				t.Errorf("truncate(%q,%d) = (%q,%d), want (%q,%d)",
-					c.body, c.width, text, omitted, c.wantText, c.wantOmitted)
-			}
-		})
-	}
-}
+import (
+	"strings"
+	"testing"
+)
 
 func TestFlatten(t *testing.T) {
 	if got := flatten("  a\n\tb   c \n"); got != "a b c" {
 		t.Errorf("flatten = %q, want %q", got, "a b c")
 	}
+}
+
+func TestWrapBody(t *testing.T) {
+	t.Run("short fits one line", func(t *testing.T) {
+		lines := wrapBody("hello world", 40, 2)
+		if len(lines) != 1 || lines[0] != "hello world" {
+			t.Errorf("got %q", lines)
+		}
+	})
+
+	t.Run("wraps to multiple lines", func(t *testing.T) {
+		lines := wrapBody("one two three four five six seven", 12, 0)
+		if len(lines) < 2 {
+			t.Errorf("expected multiple lines, got %q", lines)
+		}
+	})
+
+	t.Run("caps at maxLines with ellipsis", func(t *testing.T) {
+		lines := wrapBody("one two three four five six seven eight nine ten", 10, 2)
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 lines, got %d: %q", len(lines), lines)
+		}
+		if !strings.HasSuffix(lines[1], "…") {
+			t.Errorf("last capped line should end with ellipsis, got %q", lines[1])
+		}
+	})
+
+	t.Run("flattens newlines before wrapping", func(t *testing.T) {
+		lines := wrapBody("a\n\nb", 40, 0)
+		if len(lines) != 1 || lines[0] != "a b" {
+			t.Errorf("got %q", lines)
+		}
+	})
 }

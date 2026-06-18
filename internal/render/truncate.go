@@ -1,32 +1,44 @@
 package render
 
-import "strings"
+import (
+	"strings"
 
-// flatten collapses a comment body to a single line: newlines and runs of
-// whitespace become single spaces. Used for the compact (truncated) view.
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
+)
+
+// flatten collapses a body to a single logical line: newlines and runs of
+// whitespace become single spaces. Bodies are treated as prose, then re-wrapped
+// to the terminal width.
 func flatten(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// truncate returns a single-line, width-limited form of body plus the number
-// of runes omitted. width <= 0 means no limit (the full flattened line).
-func truncate(body string, width int) (text string, omitted int) {
-	flat := flatten(body)
-	if width <= 0 {
-		return flat, 0
+// wrapBody word-wraps a (flattened) body to width and caps it at maxLines,
+// appending an ellipsis to the last line when content was dropped. maxLines <= 0
+// means no cap. Returns at least one line (possibly empty).
+func wrapBody(body string, width, maxLines int) []string {
+	if width < 10 {
+		width = 10
 	}
-	r := []rune(flat)
-	if len(r) <= width {
-		return flat, 0
+	wrapped := wordwrap.String(flatten(body), width)
+	lines := strings.Split(strings.TrimRight(wrapped, "\n"), "\n")
+	if maxLines > 0 && len(lines) > maxLines {
+		kept := lines[:maxLines]
+		kept[maxLines-1] = clampWidth(kept[maxLines-1], width-1) + "…"
+		return kept
 	}
-	return strings.TrimRight(string(r[:width]), " ") + "…", len(r) - width
+	return lines
 }
 
-// indentBlock left-pads every line of s by pad spaces (used by --full).
-func indentBlock(s, pad string) string {
-	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
-	for i, ln := range lines {
-		lines[i] = pad + ln
+// clampWidth hard-trims a string to a display width in runes (no wrapping).
+func clampWidth(s string, width int) string {
+	if lipgloss.Width(s) <= width {
+		return s
 	}
-	return strings.Join(lines, "\n")
+	r := []rune(s)
+	for len(r) > 0 && lipgloss.Width(string(r)) > width {
+		r = r[:len(r)-1]
+	}
+	return strings.TrimRight(string(r), " ")
 }

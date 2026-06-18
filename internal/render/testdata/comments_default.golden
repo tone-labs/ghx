@@ -1,19 +1,22 @@
-PR #42  Add xpath support  [OPEN] (draft)
+#42  Add xpath support
 https://github.com/o/r/pull/42
-Review decision: CHANGES_REQUESTED
+CHANGES REQUESTED · 1 unresolved · 2 reviews · open · draft
 
-Reviews:
-  [APPROVED]          ci-bot[bot] (bot)
-  [CHANGES_REQUESTED] bob: Needs work
+REVIEWS
+  ✓ ci-bot[bot] (bot)  approved
+  ✗ bob  changes_requested
+      Needs work
 
-Threads: 2 (1 unresolved)
-  src/a.ts:72  [open]
-    bob: Why does this return element-not-found?
-      ↪ alice: Good catch, fixing.
-    thread: T_open
-  src/b.ts:10  [resolved] [outdated]
-    lint-bot[bot] (bot): nit: prefer const here for the long expl… (+52 chars — --full or --thread)
-    thread: T_resolved
+THREADS · 2
 
-Conversation:
-    carol: LGTM overall once threads are addressed.
+  [1] a.ts:72  src
+      bob  Why does this return element-not-found?
+      ↳ alice  Good catch, fixing.
+
+  [2] b.ts:10  src  (resolved, outdated)
+      lint-bot[bot] (bot)  nit: prefer const here for the long explanation that should be truncated
+                           in the compact view
+
+CONVERSATION · 1 comment   — --conversation to show
+
+drill in:  ghx comments 42 --thread <n>

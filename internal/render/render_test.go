@@ -49,15 +49,17 @@ func samplePR() *model.PR {
 
 func TestCommentsGolden(t *testing.T) {
 	var buf bytes.Buffer
-	Comments(&buf, samplePR(), Options{Width: 40})
+	Comments(&buf, samplePR(), Options{BodyLines: defaultLines})
 	checkGolden(t, "comments_default.golden", buf.Bytes())
 }
 
 func TestCommentsFullGolden(t *testing.T) {
 	var buf bytes.Buffer
-	Comments(&buf, samplePR(), Options{Full: true})
+	Comments(&buf, samplePR(), Options{BodyLines: 0, ShowConversation: true})
 	checkGolden(t, "comments_full.golden", buf.Bytes())
 }
+
+const defaultLines = 2
 
 func TestChecksGolden(t *testing.T) {
 	ck := &model.Checks{
