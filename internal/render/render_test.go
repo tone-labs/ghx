@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 var update = flag.Bool("update", false, "update golden files")

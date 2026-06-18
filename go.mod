@@ -1,4 +1,4 @@
-module github.com/cbuchan/ghx
+module github.com/tone-labs/ghx
 
 go 1.25.0
 

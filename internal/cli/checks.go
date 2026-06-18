@@ -4,9 +4,9 @@ import (
 	"flag"
 	"os"
 
-	"github.com/cbuchan/ghx/internal/ghclient"
-	"github.com/cbuchan/ghx/internal/provider"
-	"github.com/cbuchan/ghx/internal/render"
+	"github.com/tone-labs/ghx/internal/ghclient"
+	"github.com/tone-labs/ghx/internal/provider"
+	"github.com/tone-labs/ghx/internal/render"
 )
 
 func runChecks(args []string) int {

@@ -6,7 +6,7 @@ package main
 import (
 	"os"
 
-	"github.com/cbuchan/ghx/internal/cli"
+	"github.com/tone-labs/ghx/internal/cli"
 )
 
 func main() {

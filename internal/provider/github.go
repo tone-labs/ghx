@@ -6,8 +6,8 @@ package provider
 import (
 	"fmt"
 
-	"github.com/cbuchan/ghx/internal/ghclient"
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/ghclient"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 // prQuery fetches review decision, reviews, PR-level conversation comments, and
