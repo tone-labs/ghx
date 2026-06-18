@@ -29,6 +29,7 @@ func runComments(args []string) int {
 		conversation = fs.Bool("conversation", false, "expand PR-level conversation (default: collapsed)")
 		full         = fs.Bool("full", false, "expand everything: full bodies + conversation")
 		lines        = fs.Int("lines", defaultBodyLines, "max wrapped lines per comment body (0 = unlimited)")
+		width        = fs.Int("width", 0, "wrap width (0 = detect terminal width)")
 		jsonOut      = fs.Bool("json", false, "machine-readable JSON output")
 	)
 	fs.StringVar(&repo, "repo", "", "target repo as owner/repo (default: current repo)")
@@ -86,7 +87,7 @@ func runComments(args []string) int {
 		}
 		return 0
 	}
-	render.Comments(os.Stdout, pr, render.Options{BodyLines: bodyLines, ShowConversation: showConv})
+	render.Comments(os.Stdout, pr, render.Options{Width: *width, BodyLines: bodyLines, ShowConversation: showConv})
 	return 0
 }
 

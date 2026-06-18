@@ -30,13 +30,15 @@ ghx comments --thread 2      # drill into thread #2 from the listing, full text
 ghx comments --conversation  # expand the PR-level conversation
 ghx comments --full          # expand everything: full bodies + conversation
 ghx comments --lines 4       # cap each body at 4 wrapped lines (0 = unlimited)
+ghx comments --width 100     # wrap at 100 cols (0 / default = full terminal width)
 ghx comments --json          # machine-readable (full bodies)
 ```
 
 The default view leads with the **decision** and unresolved count, lists
 **reviews** (✓/✗ glyphs), then **numbered inline threads** grouped by file —
-basename and line in front, directory elided behind. Bodies wrap to the
-terminal and are capped at 2 lines (`--lines N`). Threads are numbered so you
+basename and line in front, directory elided behind. Bodies wrap to the full
+terminal width (measured at run time, like `gh pr checks`; `--width N` to
+override) and are capped at 2 lines (`--lines N`). Threads are numbered so you
 drill in by index (`--thread N`) rather than copying a node id. Only
 **unresolved** threads show by default (`--all` adds resolved, badged); the
 **conversation** collapses to a one-line count (`--conversation` to expand) —

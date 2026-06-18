@@ -15,11 +15,10 @@ import (
 
 // Options controls the human (non-JSON) comment view.
 type Options struct {
+	Width            int  // explicit wrap width; <= 0 = detect the terminal (full width)
 	BodyLines        int  // max wrapped lines per body; 0 = unlimited
 	ShowConversation bool // expand PR-level conversation (default: collapsed summary)
 }
-
-const maxWidth = 120
 
 // styles bundles the lipgloss styles for one render, bound to the output writer
 // (so color auto-detects per writer: a TTY gets color, a pipe or test buffer
@@ -47,7 +46,10 @@ func newStyles(w io.Writer) styles {
 // Comments renders the PR review state, assuming pr is already filtered.
 func Comments(w io.Writer, pr *model.PR, opts Options) {
 	s := newStyles(w)
-	width := contentWidth(w)
+	width := opts.Width
+	if width <= 0 {
+		width = contentWidth(w)
+	}
 
 	// Header + BLUF status line.
 	fmt.Fprintln(w, s.bold.Render(fmt.Sprintf("#%d  %s", pr.Number, pr.Title)))
@@ -271,14 +273,12 @@ func latestPerAuthor(reviews []model.Review) []model.Review {
 	return out
 }
 
-// contentWidth returns a sensible wrap width for the output: the terminal width
-// (capped) when writing to a TTY, else a fixed default for pipes and tests.
+// contentWidth returns the wrap width for the output: the full terminal width
+// when writing to a TTY (measured once, at print time — like `gh pr checks`),
+// else a fixed default for pipes and tests. Override via Options.Width.
 func contentWidth(w io.Writer) int {
 	if f, ok := w.(*os.File); ok {
 		if wd, _, err := term.GetSize(int(f.Fd())); err == nil && wd > 0 {
-			if wd > maxWidth {
-				return maxWidth
-			}
 			return wd
 		}
 	}
