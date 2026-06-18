@@ -1,0 +1,8 @@
+Checks (PR #42): 6 total
+  1 FAIL
+  3 PASS
+  2 PENDING
+
+Failing:
+  lint (fail)
+    https://x/runs/1
