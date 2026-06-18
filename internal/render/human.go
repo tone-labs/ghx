@@ -175,7 +175,7 @@ func writeBody(w io.Writer, s styles, indent int, label, body string, width, max
 		headPlain = pad
 		headStyled = pad
 	}
-	cont := lipgloss.Width(headPlain)
+	cont := cellWidth(headPlain)
 	lines := wrapBody(body, width-cont, maxLines)
 	if len(lines) == 0 {
 		return

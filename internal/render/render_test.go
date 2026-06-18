@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tone-labs/ghx/internal/model"
@@ -60,6 +61,25 @@ func TestCommentsFullGolden(t *testing.T) {
 }
 
 const defaultLines = 2
+
+// TestNoLineOverflow guards the wrapping bug class: at realistic widths, no
+// rendered line may exceed the budget in terminal cells — in particular the
+// wrapped comment bodies, whose "↳" reply marker is an ambiguous-width glyph a
+// terminal may render two cells wide. Single-line structural rows (the BLUF
+// status line, section/thread headers) are intentionally not wrapped, so the
+// widths tested stay above their natural length. Width is set via Options.Width
+// to avoid TTY detection.
+func TestNoLineOverflow(t *testing.T) {
+	for _, width := range []int{70, 80, 100, 120} {
+		var buf bytes.Buffer
+		Comments(&buf, samplePR(), Options{Width: width, BodyLines: 0, ShowConversation: true})
+		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+			if w := cellWidth(line); w > width {
+				t.Errorf("width=%d: line exceeds budget (%d cells): %q", width, w, line)
+			}
+		}
+	}
+}
 
 func TestChecksGolden(t *testing.T) {
 	ck := &model.Checks{
