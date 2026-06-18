@@ -9,7 +9,7 @@ import (
 
 	gh "github.com/cli/go-gh/v2"
 
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 // FetchChecks reuses gh's own status-check rollup rather than reimplementing

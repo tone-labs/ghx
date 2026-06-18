@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 // Options controls the human (non-JSON) comment view.

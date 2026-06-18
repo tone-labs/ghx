@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 func fixture() *model.PR {

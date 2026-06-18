@@ -50,7 +50,7 @@ bucket counts and failing-check detail with workflow links.
 ## Install
 
 ```
-go install github.com/cbuchan/ghx@latest   # lands in $GOBIN / $HOME/go/bin
+go install github.com/tone-labs/ghx@latest   # lands in $GOBIN / $HOME/go/bin
 # or
 go build -o ghx . && mv ghx ~/.local/bin/
 ```

@@ -5,7 +5,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/cbuchan/ghx/internal/model"
+	"github.com/tone-labs/ghx/internal/model"
 )
 
 // ChecksView renders the CI status-check rollup: bucket counts then any
