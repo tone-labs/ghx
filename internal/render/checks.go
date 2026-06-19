@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -23,13 +24,29 @@ func ChecksView(w io.Writer, pr int, ck *model.Checks, color ColorMode) {
 	}
 
 	fmt.Fprintln(w)
-	for _, b := range checkBucketOrder {
-		n := ck.Counts[b]
-		if n == 0 {
-			continue
-		}
+	line := func(b string, n int) {
 		st := bucketStyle(s, b)
 		fmt.Fprintf(w, "  %s %s\n", st.Render(bucketGlyph(b)), st.Render(fmt.Sprintf("%d %s", n, b)))
+	}
+	shown := make(map[string]bool, len(checkBucketOrder))
+	for _, b := range checkBucketOrder {
+		if n := ck.Counts[b]; n > 0 {
+			line(b, n)
+			shown[b] = true
+		}
+	}
+	// Any bucket gh emits that we don't explicitly rank renders last (sorted),
+	// via the default glyph/style — so the listed counts always sum to Total
+	// even if gh introduces a new bucket.
+	var extra []string
+	for b, n := range ck.Counts {
+		if n > 0 && !shown[b] {
+			extra = append(extra, b)
+		}
+	}
+	sort.Strings(extra)
+	for _, b := range extra {
+		line(b, ck.Counts[b])
 	}
 
 	if len(ck.Failing) > 0 {
