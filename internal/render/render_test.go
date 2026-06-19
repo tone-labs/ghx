@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tone-labs/ghx/internal/gate"
 	"github.com/tone-labs/ghx/internal/model"
 )
 
@@ -121,6 +122,26 @@ func TestColorMode(t *testing.T) {
 			t.Errorf("Color=%d: ANSI present = %v, want %v", tc.mode, got, tc.wantSeq)
 		}
 	}
+}
+
+func TestGateGolden(t *testing.T) {
+	blocked := gate.Result{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		Mergeable: false,
+		Blockers:  []string{"changes requested", "2 threads unresolved", "1 check failing"},
+		Decision:  "CHANGES_REQUESTED", Unresolved: 2, Failing: 1,
+	}
+	var buf bytes.Buffer
+	GateView(&buf, blocked, ColorAuto)
+	checkGolden(t, "gate_blocked.golden", buf.Bytes())
+
+	mergeable := gate.Result{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		Mergeable: true, Decision: "APPROVED",
+	}
+	var buf2 bytes.Buffer
+	GateView(&buf2, mergeable, ColorAuto)
+	checkGolden(t, "gate_mergeable.golden", buf2.Bytes())
 }
 
 func TestChecksGolden(t *testing.T) {

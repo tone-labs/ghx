@@ -13,13 +13,14 @@ stable `--json` contract for tooling.
 ```
 ghx comments [PR] [flags]   inline threads (+ resolution state), reviews + decision, conversation
 ghx checks   [PR] [flags]   CI status-check rollup: bucket counts + failing detail
+ghx gate     [PR] [flags]   mergeability verdict: decision + threads + checks (exit 8 if blocked)
 ghx version                 print the version
 ```
 
 With no `PR` argument, `ghx` operates on the open PR for the current branch
 (resolved via `gh`). Pass `-R, --repo owner/repo` to target another repository.
-Commands accept short aliases (`ghx c`, `ghx ck`), and `-h`/`--help` works on
-every command (`ghx comments -h` lists flags and examples).
+Commands accept short aliases (`ghx c`, `ghx ck`, `ghx g`), and `-h`/`--help`
+works on every command (`ghx comments -h` lists flags and examples).
 
 ### `ghx comments`
 
@@ -63,6 +64,20 @@ ghx checks --exit-code    # exit 8 if any check is failing (for CI/scripts)
 Reuses `gh`'s own status-check rollup (no reimplementation), reshaped into
 bucket counts and failing-check detail with workflow links.
 
+### `ghx gate`
+
+```
+ghx gate                  # is the current branch's PR ready to merge?
+ghx gate 1667 --json      # structured verdict
+ghx gate && gh pr merge   # gate before merging
+```
+
+Unions the **review decision**, **unresolved threads**, and **CI checks** into
+one verdict — `MERGEABLE`, or `BLOCKED` with the blockers listed. Exits `8` when
+blocked (no flag needed — the verdict is the command's purpose), so it gates a
+merge or a CI step. Catches the easy-to-miss case of an *approved* PR still held
+up by an open thread or a still-running check.
+
 ## Scripting
 
 `--json` is a boolean toggle that emits the full normalized structure (unlike
@@ -76,7 +91,9 @@ ghx checks  --json | jq -r '.failing[] | "\(.name)\t\(.link)"'
 Exit codes: `0` success, `1` runtime error (no PR found, `gh` failure), `2`
 usage/flag error. With `--exit-code`, `ghx checks` additionally returns `8` (the
 `gh pr checks` convention — distinct from `1`/`2`) when any check is failing, so
-CI gates and the `/scout` flow can branch on status without parsing JSON.
+CI gates and the `/scout` flow can branch on status without parsing JSON. `ghx
+gate` returns `8` when the PR is blocked — no flag needed, since the verdict is
+the whole point of the command.
 
 ## Install
 
@@ -99,6 +116,6 @@ the read path; swapping or augmenting sources is contained to that package.
 Rendering (`internal/render`) offers a human view and a JSON view; the JSON
 schema is the stable contract for downstream tooling.
 
-A `gate` subcommand — unioning review decision, unresolved threads, and
-required checks into one "what's holding up this PR" payload — is a planned
-addition; the model already carries every field it needs.
+The `gate` subcommand unions the review decision, unresolved threads, and CI
+checks into one "what's holding up this PR" verdict (`internal/gate`, a pure
+evaluation over the same normalized model the other views fill).

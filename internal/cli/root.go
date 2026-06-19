@@ -79,7 +79,7 @@ func newRootCmd() *cobra.Command {
 	root.SetVersionTemplate("ghx {{.Version}}\n")
 	// Keep the surface minimal: drop cobra's auto `completion` command for now.
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.AddCommand(newCommentsCmd(), newChecksCmd(), newVersionCmd())
+	root.AddCommand(newCommentsCmd(), newChecksCmd(), newGateCmd(), newVersionCmd())
 	return root
 }
 
