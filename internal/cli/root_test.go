@@ -9,25 +9,54 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/tone-labs/ghx/internal/render"
 )
 
-func TestExitCode(t *testing.T) {
+func TestResolveExit(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		want int
+		name     string
+		err      error
+		wantCode int
+		wantShow bool
 	}{
-		{"nil is success", nil, 0},
-		{"cmdError is runtime failure", fail(errors.New("boom")), 1},
-		{"wrapped cmdError still 1", fmt.Errorf("ctx: %w", fail(errors.New("boom"))), 1},
-		{"plain error is usage", errors.New("bad flag"), 2},
+		{"nil is success", nil, 0, false},
+		{"cmdError is runtime failure", fail(errors.New("boom")), 1, true},
+		{"wrapped cmdError still 1", fmt.Errorf("ctx: %w", fail(errors.New("boom"))), 1, true},
+		{"plain error is usage", errors.New("bad flag"), 2, true},
+		{"statusError carries code, no output", statusExit(1), 1, false},
+		{"statusError arbitrary code", statusExit(3), 3, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := exitCode(tt.err); got != tt.want {
-				t.Errorf("exitCode = %d, want %d", got, tt.want)
+			code, show := resolveExit(tt.err)
+			if code != tt.wantCode || show != tt.wantShow {
+				t.Errorf("resolveExit = (%d, %v), want (%d, %v)", code, show, tt.wantCode, tt.wantShow)
 			}
 		})
+	}
+}
+
+func TestColorFlag(t *testing.T) {
+	var def colorFlag // zero value
+	if def.String() != "auto" {
+		t.Errorf("default String() = %q, want auto", def.String())
+	}
+	valid := map[string]render.ColorMode{
+		"auto": render.ColorAuto, "always": render.ColorAlways, "never": render.ColorNever,
+	}
+	for in, want := range valid {
+		var c colorFlag
+		if err := c.Set(in); err != nil {
+			t.Errorf("Set(%q) error: %v", in, err)
+		}
+		if c.mode != want {
+			t.Errorf("Set(%q) mode = %v, want %v", in, c.mode, want)
+		}
+	}
+	var bad colorFlag
+	if err := bad.Set("rainbow"); err == nil {
+		t.Error("Set(rainbow) should error")
 	}
 }
 
@@ -102,8 +131,8 @@ func TestUsageErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected an error")
 			}
-			if got := exitCode(err); got != 2 {
-				t.Errorf("exitCode = %d, want 2 (err: %v)", got, err)
+			if code, _ := resolveExit(err); code != 2 {
+				t.Errorf("exit code = %d, want 2 (err: %v)", code, err)
 			}
 		})
 	}
