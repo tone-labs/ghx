@@ -26,16 +26,23 @@ ghx comments 1667 --all      # include resolved threads
 ghx comments --bots          # only bot-authored items (Copilot, linters, …)
 ghx comments --humans        # only human-authored items
 ghx comments --author alice  # only a specific login (overrides --bots/--humans)
-ghx comments --thread PRRT_… # drill into one thread, full text
-ghx comments --full          # full bodies, no truncation
-ghx comments --json          # machine-readable (full bodies; ignores --truncate)
+ghx comments --thread 2      # drill into thread #2 from the listing, full text
+ghx comments --conversation  # expand the PR-level conversation
+ghx comments --full          # expand everything: full bodies + conversation
+ghx comments --lines 4       # cap each body at 4 wrapped lines (0 = unlimited)
+ghx comments --width 100     # wrap at 100 cols (0 / default = full terminal width)
+ghx comments --json          # machine-readable (full bodies)
 ```
 
-Default output groups inline threads by file with an `[open]` / `[resolved]` /
-`[outdated]` badge and surfaces each thread id so you can drill in. The compact
-view truncates bodies (default 200 chars, `--truncate N`, `0` = no limit) and
-tells you how much was elided. By default only **unresolved** threads show —
-the "what still needs attention" view; `--all` adds resolved ones.
+The default view leads with the **decision** and unresolved count, lists
+**reviews** (✓/✗ glyphs), then **numbered inline threads** grouped by file —
+basename and line in front, directory elided behind. Bodies wrap to the full
+terminal width (measured at run time, like `gh pr checks`; `--width N` to
+override) and are capped at 2 lines (`--lines N`). Threads are numbered so you
+drill in by index (`--thread N`) rather than copying a node id. Only
+**unresolved** threads show by default (`--all` adds resolved, badged); the
+**conversation** collapses to a one-line count (`--conversation` to expand) —
+that's where bot noise lives. Color is on for a terminal, off when piped.
 
 ### `ghx checks`
 

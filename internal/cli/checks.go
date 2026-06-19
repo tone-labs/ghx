@@ -25,7 +25,7 @@ func runChecks(args []string) int {
 		fs.PrintDefaults()
 	}
 
-	prArg, rest := splitPR(args)
+	prArg, rest := splitPR(args, valueFlagNames(fs))
 	if err := fs.Parse(rest); err != nil {
 		return 2
 	}
