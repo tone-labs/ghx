@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
+
+	"github.com/spf13/cobra"
 
 	"github.com/tone-labs/ghx/internal/ghclient"
 	"github.com/tone-labs/ghx/internal/model"
@@ -15,80 +16,90 @@ import (
 // 0 means unlimited (set by --full or --lines 0).
 const defaultBodyLines = 2
 
-func runComments(args []string) int {
-	fs := flag.NewFlagSet("comments", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+func newCommentsCmd() *cobra.Command {
 	var (
 		repo         string
-		all          = fs.Bool("all", false, "include resolved threads (default: unresolved only)")
-		hideOutdated = fs.Bool("hide-outdated", false, "exclude outdated threads")
-		bots         = fs.Bool("bots", false, "only bot-authored items")
-		humans       = fs.Bool("humans", false, "only human-authored items")
-		author       = fs.String("author", "", "only items authored by this login (overrides --bots/--humans)")
-		thread       = fs.Int("thread", 0, "drill into thread number N (from the listing), in full")
-		conversation = fs.Bool("conversation", false, "expand PR-level conversation (default: collapsed)")
-		full         = fs.Bool("full", false, "expand everything: full bodies + conversation")
-		lines        = fs.Int("lines", defaultBodyLines, "max wrapped lines per comment body (0 = unlimited)")
-		width        = fs.Int("width", 0, "wrap width (0 = detect terminal width)")
-		jsonOut      = fs.Bool("json", false, "machine-readable JSON output")
+		all          bool
+		hideOutdated bool
+		bots         bool
+		humans       bool
+		author       string
+		thread       int
+		conversation bool
+		full         bool
+		lines        int
+		width        int
+		jsonOut      bool
 	)
-	fs.StringVar(&repo, "repo", "", "target repo as owner/repo (default: current repo)")
-	fs.StringVar(&repo, "R", "", "shorthand for --repo")
-	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), "Usage: ghx comments [PR] [flags]\n\n"+
-			"Inline review threads (with resolution state), reviews + decision,\n"+
-			"and PR-level conversation. Defaults to the current branch's PR and to\n"+
-			"unresolved threads only.\n\nFlags:\n")
-		fs.PrintDefaults()
-	}
+	cmd := &cobra.Command{
+		Use:     "comments [PR]",
+		Aliases: []string{"c"},
+		Short:   "Inline review threads, reviews + decision, and conversation",
+		Long: "Inline review threads (with resolution state), reviews + decision,\n" +
+			"and PR-level conversation. Defaults to the current branch's PR and to\n" +
+			"unresolved threads only.",
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true // parsing done; runtime errors shouldn't dump usage
 
-	prArg, rest := splitPR(args, valueFlagNames(fs))
-	if err := fs.Parse(rest); err != nil {
-		return 2
-	}
+			c, err := ghclient.New(repo)
+			if err != nil {
+				return fail(err)
+			}
+			prNum, err := ghclient.ResolvePR(prArg(args), repo)
+			if err != nil {
+				return fail(err)
+			}
+			pr, err := provider.FetchPR(c, prNum)
+			if err != nil {
+				return fail(err)
+			}
 
-	c, err := ghclient.New(repo)
-	if err != nil {
-		return fail(err)
-	}
-	prNum, err := ghclient.ResolvePR(prArg, repo)
-	if err != nil {
-		return fail(err)
-	}
-	pr, err := provider.FetchPR(c, prNum)
-	if err != nil {
-		return fail(err)
-	}
+			commentFilter{
+				all:          all,
+				hideOutdated: hideOutdated,
+				bots:         bots,
+				humans:       humans,
+				author:       author,
+			}.apply(pr)
 
-	commentFilter{
-		all:          *all,
-		hideOutdated: *hideOutdated,
-		bots:         *bots,
-		humans:       *humans,
-		author:       *author,
-	}.apply(pr)
+			bodyLines := lines
+			showConv := conversation
+			if full {
+				bodyLines = 0
+				showConv = true
+			}
+			if thread > 0 {
+				if err := selectThread(pr, thread); err != nil {
+					return fail(err)
+				}
+				bodyLines = 0 // a drilled-in thread always shows full text
+			}
 
-	bodyLines := *lines
-	showConv := *conversation
-	if *full {
-		bodyLines = 0
-		showConv = true
+			if jsonOut {
+				if err := render.JSON(os.Stdout, pr); err != nil {
+					return fail(err)
+				}
+				return nil
+			}
+			render.Comments(os.Stdout, pr, render.Options{Width: width, BodyLines: bodyLines, ShowConversation: showConv})
+			return nil
+		},
 	}
-	if *thread > 0 {
-		if err := selectThread(pr, *thread); err != nil {
-			return fail(err)
-		}
-		bodyLines = 0 // a drilled-in thread always shows full text
-	}
-
-	if *jsonOut {
-		if err := render.JSON(os.Stdout, pr); err != nil {
-			return fail(err)
-		}
-		return 0
-	}
-	render.Comments(os.Stdout, pr, render.Options{Width: *width, BodyLines: bodyLines, ShowConversation: showConv})
-	return 0
+	f := cmd.Flags()
+	f.BoolVar(&all, "all", false, "include resolved threads (default: unresolved only)")
+	f.BoolVar(&hideOutdated, "hide-outdated", false, "exclude outdated threads")
+	f.BoolVar(&bots, "bots", false, "only bot-authored items")
+	f.BoolVar(&humans, "humans", false, "only human-authored items")
+	f.StringVar(&author, "author", "", "only items authored by this login (overrides --bots/--humans)")
+	f.IntVar(&thread, "thread", 0, "drill into thread number N (from the listing), in full")
+	f.BoolVar(&conversation, "conversation", false, "expand PR-level conversation (default: collapsed)")
+	f.BoolVar(&full, "full", false, "expand everything: full bodies + conversation")
+	f.IntVar(&lines, "lines", defaultBodyLines, "max wrapped lines per comment body (0 = unlimited)")
+	f.IntVar(&width, "width", 0, "wrap width (0 = detect terminal width)")
+	f.BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
+	f.StringVarP(&repo, "repo", "R", "", "target repo as owner/repo (default: current repo)")
+	return cmd
 }
 
 // selectThread reduces pr to the single thread at 1-based index n (its position

@@ -1,123 +1,90 @@
-// Package cli implements ghx's subcommand dispatch and per-command flag
-// parsing. Kept dependency-light: stdlib flag with one FlagSet per command.
+// Package cli implements ghx's subcommands. Built on cobra/pflag so the
+// positional PR argument and flags parse in any order, with gh-style long/short
+// forms (`--repo`/`-R`) — no hand-rolled arg splitting.
 package cli
 
 import (
-	"flag"
+	"errors"
 	"fmt"
-	"io"
 	"os"
-	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // Version is the build version, overridable via -ldflags at release time.
 var Version = "dev"
 
-// Run dispatches to a subcommand and returns a process exit code.
-func Run(args []string) int {
-	if len(args) == 0 {
-		usage(os.Stderr)
-		return 2
+// cmdError marks a runtime failure (as opposed to a flag/usage error) returned
+// from a command's RunE, so Execute can print it in ghx's "ghx: <msg>" form and
+// exit 1 while leaving cobra's usage-on-parse-error path (exit 2) intact.
+type cmdError struct{ err error }
+
+func (e *cmdError) Error() string { return e.err.Error() }
+func (e *cmdError) Unwrap() error { return e.err }
+
+// fail wraps err as a runtime failure for return from a command's RunE.
+func fail(err error) error { return &cmdError{err} }
+
+// Execute builds the command tree, runs it, and returns a process exit code.
+func Execute() int {
+	err := newRootCmd().Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ghx: %v\n", err)
 	}
-	switch args[0] {
-	case "comments", "c":
-		return runComments(args[1:])
-	case "checks", "ck":
-		return runChecks(args[1:])
-	case "-h", "--help", "help":
-		usage(os.Stdout)
+	return exitCode(err)
+}
+
+// exitCode maps a command error to a process exit code: 0 success, 1 runtime
+// failure (a *cmdError returned via fail()), 2 usage/flag/unknown-command error
+// (cobra's own errors, which it has already printed usage for).
+func exitCode(err error) int {
+	switch {
+	case err == nil:
 		return 0
-	case "-v", "--version", "version":
-		fmt.Printf("ghx %s\n", Version)
-		return 0
+	case errors.As(err, new(*cmdError)):
+		return 1
 	default:
-		fmt.Fprintf(os.Stderr, "ghx: unknown command %q\n\n", args[0])
-		usage(os.Stderr)
 		return 2
 	}
 }
 
-func usage(w io.Writer) {
-	fmt.Fprint(w, `ghx — gh extras: the PR-review views gh leaves out
-
-Usage:
-  ghx comments [PR] [flags]   inline review threads, reviews, and conversation
-  ghx checks   [PR] [flags]   CI status-check rollup (buckets + failing detail)
-
-Common flags:
-  -R, --repo owner/repo   target repo (default: current directory's repo)
-      --json              machine-readable output
-  -h, --help              help for a command
-
-With no PR argument, ghx operates on the open PR for the current branch.
-Run "ghx comments -h" or "ghx checks -h" for command-specific flags.
-`)
-}
-
-// fail prints an error to stderr and returns exit code 1.
-func fail(err error) int {
-	fmt.Fprintf(os.Stderr, "ghx: %v\n", err)
-	return 1
-}
-
-// splitPR extracts a single positional PR argument from args (whether it
-// appears before or after flags) and returns it plus the remaining args for
-// flag parsing. stdlib flag stops at the first non-flag token, so we pull the
-// positional out ourselves to allow `ghx comments 123 --json`.
-//
-// valueFlags names the flags that take a separate value token (`--width 100`);
-// without it a numeric value would be mistaken for the PR, leaving the flag with
-// no argument. The `--flag=value` form carries its own value and is unaffected.
-func splitPR(args []string, valueFlags map[string]bool) (pr string, rest []string) {
-	rest = make([]string, 0, len(args))
-	skipValue := false
-	for _, a := range args {
-		switch {
-		case skipValue:
-			// This token is the value of the preceding value-taking flag.
-			skipValue = false
-		case len(a) > 0 && a[0] == '-':
-			name := strings.TrimLeft(a, "-")
-			skipValue = name != "" && !strings.ContainsRune(a, '=') && valueFlags[name]
-		case pr == "" && isPRish(a):
-			pr = a
-			continue
-		}
-		rest = append(rest, a)
+func newRootCmd() *cobra.Command {
+	root := &cobra.Command{
+		Use:   "ghx",
+		Short: "gh extras: the PR-review views gh leaves out",
+		Long: "ghx — gh extras: the PR-review views gh leaves out\n\n" +
+			"Inline review threads (with resolution state), the review-decision\n" +
+			"gate, PR-level conversation, and the CI status-check rollup. With no\n" +
+			"PR argument, ghx operates on the open PR for the current branch.",
+		Version:       Version,
+		SilenceErrors: true, // Execute() owns error printing ("ghx: <msg>")
+		// SilenceUsage stays false so flag/arg errors still show usage; each
+		// RunE flips it true after parsing so runtime failures don't dump usage.
 	}
-	return pr, rest
+	root.SetVersionTemplate("ghx {{.Version}}\n")
+	// Keep the surface minimal: drop cobra's auto `completion` command for now.
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.AddCommand(newCommentsCmd(), newChecksCmd(), newVersionCmd())
+	return root
 }
 
-// valueFlagNames returns the names of fs's flags that take a separate value
-// argument — every non-boolean flag. splitPR uses it to tell a flag's value
-// apart from the positional PR.
-func valueFlagNames(fs *flag.FlagSet) map[string]bool {
-	out := map[string]bool{}
-	fs.VisitAll(func(f *flag.Flag) {
-		if bf, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && bf.IsBoolFlag() {
-			return
-		}
-		out[f.Name] = true
-	})
-	return out
+// newVersionCmd preserves the `ghx version` form (alongside cobra's --version),
+// matching gh and the pre-cobra CLI.
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the ghx version",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			fmt.Fprintf(cmd.OutOrStdout(), "ghx %s\n", Version)
+		},
+	}
 }
 
-func isPRish(s string) bool {
-	s = trimHash(s)
-	if s == "" {
-		return false
+// prArg returns the optional positional PR argument, or "" when omitted.
+func prArg(args []string) string {
+	if len(args) > 0 {
+		return args[0]
 	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func trimHash(s string) string {
-	if len(s) > 0 && s[0] == '#' {
-		return s[1:]
-	}
-	return s
+	return ""
 }
