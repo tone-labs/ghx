@@ -5,8 +5,8 @@ go 1.25.0
 require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250319133953-166f707985bc
 	github.com/cli/go-gh/v2 v2.13.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/mattn/go-runewidth v0.0.16
-	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.30.0

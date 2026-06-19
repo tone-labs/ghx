@@ -6,8 +6,10 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dustin/go-humanize"
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
 
@@ -29,6 +31,7 @@ type Options struct {
 	BodyLines        int       // max wrapped lines per body; 0 = unlimited
 	ShowConversation bool      // expand PR-level conversation (default: collapsed summary)
 	Color            ColorMode // when to colorize (default: ColorAuto)
+	Now              time.Time // reference time for relative timestamps; zero = time.Now()
 }
 
 // styles bundles the lipgloss styles for one render, bound to the output writer
@@ -72,6 +75,10 @@ const rightGutter = 2
 
 func Comments(w io.Writer, pr *model.PR, opts Options) {
 	s := newStyles(w, opts.Color)
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
 	width := opts.Width
 	if width <= 0 {
 		width = contentWidth(w) - rightGutter
@@ -92,8 +99,9 @@ func Comments(w io.Writer, pr *model.PR, opts Options) {
 		fmt.Fprintln(w, "\n"+s.faint.Render("REVIEWS"))
 		for _, r := range reviews {
 			g := reviewGlyph(s, r.State)
-			fmt.Fprintf(w, "  %s %s%s  %s\n", g, s.author.Render(r.Author), botTag(s, r.IsBot),
-				s.faint.Render(strings.ToLower(r.State)))
+			state := s.faint.Render(strings.ReplaceAll(strings.ToLower(r.State), "_", " "))
+			meta := commentMeta(s, r.SubmittedAt, r.Author == pr.Author, now)
+			fmt.Fprintf(w, "  %s %s%s  %s%s\n", g, s.author.Bold(true).Render(displayAuthor(r.Author)), botTag(s, r.IsBot), state, meta)
 			writeBodyLines(w, 6, r.Body, width, opts.BodyLines)
 		}
 	}
@@ -102,13 +110,13 @@ func Comments(w io.Writer, pr *model.PR, opts Options) {
 		hdr := fmt.Sprintf("THREADS · %d", len(pr.Threads))
 		fmt.Fprintln(w, "\n"+s.faint.Render(hdr))
 		for i, t := range pr.Threads {
-			renderThread(w, s, i+1, t, width, opts.BodyLines)
+			renderThread(w, s, i+1, t, pr.Author, now, width, opts.BodyLines)
 		}
 	} else {
 		fmt.Fprintln(w, "\n"+s.faint.Render("No threads."))
 	}
 
-	renderConversation(w, s, pr, width, opts)
+	renderConversation(w, s, pr, now, width, opts)
 
 	if len(pr.Threads) > 1 {
 		fmt.Fprintln(w, "\n"+s.faint.Render(fmt.Sprintf("drill in:  ghx comments %d --thread <n>", pr.Number)))
@@ -163,7 +171,7 @@ func reviewGlyph(s styles, state string) string {
 	}
 }
 
-func renderThread(w io.Writer, s styles, n int, t model.Thread, width, bodyLines int) {
+func renderThread(w io.Writer, s styles, n int, t model.Thread, prAuthor string, now time.Time, width, bodyLines int) {
 	base, dir := splitPath(t.Path)
 	loc := s.file.Render(base)
 	if t.Line > 0 {
@@ -176,10 +184,8 @@ func renderThread(w io.Writer, s styles, n int, t model.Thread, width, bodyLines
 	head += threadBadge(s, t)
 	fmt.Fprintln(w, "\n"+head)
 	for i, c := range t.Comments {
-		if i > 0 {
-			fmt.Fprintln(w) // separate stacked comments
-		}
-		writeComment(w, s, 6, i > 0, c.Author, c.IsBot, c.Body, width, bodyLines)
+		meta := commentMeta(s, c.CreatedAt, c.Author == prAuthor, now)
+		writeComment(w, s, 6, i > 0, c.Author, c.IsBot, meta, c.Body, width, bodyLines)
 	}
 }
 
@@ -200,18 +206,58 @@ func writeBodyLines(w io.Writer, indent int, body string, width, maxLines int) {
 // line (replies get a "↳" in the left gutter), then the wrapped body at a fixed
 // indent. Because the body indent is constant, body text never staggers with
 // author-name length, and the body always gets width-indent to wrap in.
-func writeComment(w io.Writer, s styles, indent int, reply bool, author string, isBot bool, body string, width, maxLines int) {
-	header := strings.Repeat(" ", indent)
-	if reply && indent >= 3 {
-		// "↳ " (3 cells under the East-Asian-width convention) hangs in the
-		// gutter so the author name still starts at `indent`.
-		header = strings.Repeat(" ", indent-3) + s.faint.Render("↳ ")
+func writeComment(w io.Writer, s styles, indent int, reply bool, author string, isBot bool, meta, body string, width, maxLines int) {
+	// Names and bodies sit at a fixed indent so nothing staggers. A reply is
+	// marked only by a subtle "↳" in the gutter on its header line; the body
+	// stays flush at the indent (no bar, no content offset).
+	pad := strings.Repeat(" ", indent)
+	head := pad
+	if reply && indent >= 2 {
+		head = strings.Repeat(" ", indent-2) + s.faint.Render("↳ ")
 	}
-	fmt.Fprintln(w, header+s.author.Render(author)+botTag(s, isBot))
-	writeBodyLines(w, indent, body, width, maxLines)
+	fmt.Fprintln(w, head+s.author.Bold(true).Render(displayAuthor(author))+botTag(s, isBot)+meta)
+	if strings.TrimSpace(body) != "" {
+		for _, ln := range wrapBody(body, width-indent, maxLines) {
+			fmt.Fprintln(w, pad+ln)
+		}
+	}
 }
 
-func renderConversation(w io.Writer, s styles, pr *model.PR, width int, opts Options) {
+// displayAuthor strips a trailing "[bot]" from a login for display; the (bot)
+// tag conveys bot-ness instead (GitHub-style: "github-actions", not
+// "github-actions[bot]").
+func displayAuthor(a string) string {
+	return strings.TrimSuffix(a, "[bot]")
+}
+
+// commentMeta builds the faint "  · 2 days ago · author" header suffix from a
+// timestamp and whether the author is the PR author. Empty parts are omitted;
+// returns "" when there's nothing to show.
+func commentMeta(s styles, ts string, isAuthor bool, now time.Time) string {
+	var parts []string
+	if rel := relativeTime(ts, now); rel != "" {
+		parts = append(parts, rel)
+	}
+	if isAuthor {
+		parts = append(parts, "author")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return s.faint.Render("  ·  " + strings.Join(parts, "  ·  "))
+}
+
+// relativeTime renders an RFC3339 timestamp as a human "… ago" string relative
+// to now (via go-humanize). Returns "" for an empty/unparseable or future time.
+func relativeTime(ts string, now time.Time) string {
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil || t.After(now) {
+		return ""
+	}
+	return humanize.RelTime(t, now, "ago", "")
+}
+
+func renderConversation(w io.Writer, s styles, pr *model.PR, now time.Time, width int, opts Options) {
 	if len(pr.Conversation) == 0 {
 		return
 	}
@@ -234,7 +280,8 @@ func renderConversation(w io.Writer, s styles, pr *model.PR, width int, opts Opt
 		if i > 0 {
 			fmt.Fprintln(w) // separate stacked comments
 		}
-		writeComment(w, s, 2, false, c.Author, c.IsBot, c.Body, width, opts.BodyLines)
+		meta := commentMeta(s, c.CreatedAt, c.Author == pr.Author, now)
+		writeComment(w, s, 2, false, c.Author, c.IsBot, meta, c.Body, width, opts.BodyLines)
 	}
 }
 
