@@ -11,10 +11,12 @@ stable `--json` contract for tooling.
 ## Commands
 
 ```
-ghx comments [PR] [flags]   inline threads (+ resolution state), reviews + decision, conversation
-ghx checks   [PR] [flags]   CI status-check rollup: bucket counts + failing detail
-ghx gate     [PR] [flags]   mergeability verdict: decision + threads + checks (exit 8 if blocked)
-ghx version                 print the version
+ghx comments  [PR] [flags]   inline threads (+ resolution state), reviews + decision, conversation
+ghx checks    [PR] [flags]   CI status-check rollup: bucket counts + failing detail
+ghx gate      [PR] [flags]   mergeability verdict: decision + threads + checks (exit 8 if blocked)
+ghx resolve   [PR] [flags]   mark a review thread resolved (by listing number)
+ghx unresolve [PR] [flags]   reopen a resolved review thread
+ghx version                  print the version
 ```
 
 With no `PR` argument, `ghx` operates on the open PR for the current branch
@@ -83,6 +85,22 @@ check (GitHub's `UNSTABLE`) doesn't block, a merge conflict or out-of-date branc
 does. When GitHub hasn't computed a state yet it falls back to a best-effort union
 of the finer signals. Exits `8` when blocked (no flag needed — the verdict is the
 command's purpose), so it gates a merge or a CI step.
+
+### `ghx resolve` / `ghx unresolve`
+
+```
+ghx resolve                  # list unresolved threads, numbered
+ghx resolve --thread 2       # resolve thread #2
+ghx unresolve                # list resolved threads, numbered
+ghx unresolve --thread 1     # reopen thread #1
+```
+
+Toggle a review thread's resolution state by its **listing number** — the same
+`N` that `ghx comments` shows by default — so you never copy a node id. Each verb acts on the
+threads it can: `resolve` numbers the *unresolved* threads, `unresolve` the
+*resolved* ones. With no `--thread`, it lists those targets (a one-line preview
+each) so you can pick; with `--thread N` it toggles the Nth. These are the first
+*write* verbs in ghx — explicit, single-thread, no bulk flag.
 
 ## Scripting
 
