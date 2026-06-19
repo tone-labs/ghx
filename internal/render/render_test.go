@@ -7,12 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tone-labs/ghx/internal/gate"
 	"github.com/tone-labs/ghx/internal/model"
 )
 
 var update = flag.Bool("update", false, "update golden files")
+
+// sampleNow is a fixed reference time for relative timestamps so the comment
+// goldens stay stable. The sample's timestamps sit 1-2 days before it.
+var sampleNow = time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 
 func samplePR() *model.PR {
 	return &model.PR{
@@ -32,33 +37,56 @@ func samplePR() *model.PR {
 			{
 				ID: "T_open", Path: "src/a.ts", Line: 72, IsResolved: false,
 				Comments: []model.Comment{
-					{Author: "bob", Body: "Why does this return element-not-found?"},
-					{Author: "alice", Body: "Good catch, fixing."},
+					{Author: "bob", CreatedAt: "2026-01-01T10:00:00Z", Body: "Why does this return element-not-found?"},
+					{Author: "alice", CreatedAt: "2026-01-02T11:00:00Z", Body: "Good catch, fixing."},
 				},
 			},
 			{
 				ID: "T_resolved", Path: "src/b.ts", Line: 10, IsResolved: true, IsOutdated: true,
 				Comments: []model.Comment{
-					{Author: "lint-bot[bot]", IsBot: true, Body: "nit: prefer const here for the long explanation that should be truncated in the compact view"},
+					{Author: "lint-bot[bot]", IsBot: true, CreatedAt: "2026-01-01T09:00:00Z", Body: "nit: prefer const here for the long explanation that should be truncated in the compact view"},
 				},
 			},
 		},
 		Conversation: []model.Comment{
-			{Author: "carol", Body: "LGTM overall once threads are addressed."},
+			{Author: "carol", CreatedAt: "2026-01-02T12:00:00Z", Body: "LGTM overall once threads are addressed."},
 		},
 	}
 }
 
 func TestCommentsGolden(t *testing.T) {
 	var buf bytes.Buffer
-	Comments(&buf, samplePR(), Options{BodyLines: defaultLines})
+	Comments(&buf, samplePR(), Options{BodyLines: defaultLines, Now: sampleNow})
 	checkGolden(t, "comments_default.golden", buf.Bytes())
 }
 
 func TestCommentsFullGolden(t *testing.T) {
 	var buf bytes.Buffer
-	Comments(&buf, samplePR(), Options{BodyLines: 0, ShowConversation: true})
+	Comments(&buf, samplePR(), Options{BodyLines: 0, ShowConversation: true, Now: sampleNow})
 	checkGolden(t, "comments_full.golden", buf.Bytes())
+}
+
+func TestRelativeTime(t *testing.T) {
+	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+	// empty, unparseable, and future timestamps all yield "".
+	for _, ts := range []string{"", "not-a-time", "2026-01-11T00:00:00Z"} {
+		if got := relativeTime(ts, now); got != "" {
+			t.Errorf("relativeTime(%q) = %q, want \"\"", ts, got)
+		}
+	}
+	// a past timestamp yields a humanized "… ago" string.
+	if got := relativeTime("2026-01-08T12:00:00Z", now); !strings.HasSuffix(got, "ago") {
+		t.Errorf("relativeTime(past) = %q, want a '… ago' string", got)
+	}
+}
+
+func TestDisplayAuthor(t *testing.T) {
+	if got := displayAuthor("github-actions[bot]"); got != "github-actions" {
+		t.Errorf("displayAuthor(bot) = %q, want github-actions", got)
+	}
+	if got := displayAuthor("alice"); got != "alice" {
+		t.Errorf("displayAuthor(human) = %q, want alice", got)
+	}
 }
 
 const defaultLines = 2

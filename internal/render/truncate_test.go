@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-func TestFlatten(t *testing.T) {
-	if got := flatten("  a\n\tb   c \n"); got != "a b c" {
-		t.Errorf("flatten = %q, want %q", got, "a b c")
-	}
-}
-
 func TestWrapBody(t *testing.T) {
 	t.Run("short fits one line", func(t *testing.T) {
 		lines := wrapBody("hello world", 40, 2)
@@ -69,6 +63,22 @@ func TestWrapBody(t *testing.T) {
 		}
 		if !strings.HasSuffix(lines[1], "…") {
 			t.Errorf("truncated CJK should signal with ellipsis, got %q", lines[1])
+		}
+	})
+
+	t.Run("breaks at word boundary, never one cell over (no mid-word split)", func(t *testing.T) {
+		// Regression: muesli/wordwrap returned a line one cell over the width,
+		// and the hard-clamp split a word mid-character ("lets" -> "let"/"s").
+		// wrapText must break at the last word boundary that fits.
+		body := "Not a switch - it's what we'd discussed for smoothing bursts. The token-bucket lets a client spend accumulated headroom."
+		lines := wrapBody(body, 82, 0)
+		for _, ln := range lines {
+			if w := cellWidth(ln); w > 82 {
+				t.Errorf("line exceeds width: %d cells in %q", w, ln)
+			}
+		}
+		if joined := strings.Join(lines, " "); joined != body {
+			t.Errorf("word-wrap altered content:\n got  %q\n want %q", joined, body)
 		}
 	})
 
