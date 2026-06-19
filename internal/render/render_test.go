@@ -136,7 +136,7 @@ func TestColorMode(t *testing.T) {
 func TestGateGolden(t *testing.T) {
 	blockedPR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED",
+		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED", MergeStateStatus: "BLOCKED",
 		Threads: []model.Thread{{IsResolved: false}, {IsResolved: false}},
 	}
 	blockedCk := &model.Checks{Counts: map[string]int{}, Failing: []model.Check{{Bucket: "fail"}}}
@@ -146,11 +146,31 @@ func TestGateGolden(t *testing.T) {
 
 	mergeablePR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		State: "OPEN", ReviewDecision: "APPROVED",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "CLEAN",
 	}
 	var buf2 bytes.Buffer
 	GateView(&buf2, gate.Evaluate(mergeablePR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
 	checkGolden(t, "gate_mergeable.golden", buf2.Bytes())
+
+	// UNSTABLE is the key fix: non-required checks are red but the PR still
+	// merges, so the verdict is MERGEABLE with the reds flagged "not required".
+	unstablePR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "UNSTABLE",
+	}
+	unstableCk := &model.Checks{Counts: map[string]int{"pending": 1}, Failing: []model.Check{{Bucket: "fail"}}}
+	var bufU bytes.Buffer
+	GateView(&bufU, gate.Evaluate(unstablePR, unstableCk), ColorAuto)
+	checkGolden(t, "gate_unstable.golden", bufU.Bytes())
+
+	// DIRTY surfaces the conflict row; CONFLICTING mergeable corroborates it.
+	conflictPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "DIRTY", Mergeable: "CONFLICTING",
+	}
+	var bufC bytes.Buffer
+	GateView(&bufC, gate.Evaluate(conflictPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_conflict.golden", bufC.Bytes())
 
 	// Merged is terminal: purple MERGED headline, breakdown still shown.
 	mergedPR := &model.PR{

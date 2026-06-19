@@ -31,6 +31,12 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	default: // BLOCKED
 		fmt.Fprintln(w, s.red.Render("✗ BLOCKED")+s.faint.Render("  ·  "+plural(len(r.Blockers), "blocker")))
 	}
+	// Show GitHub's own merge-button state (the anchor) when it gave us one, so
+	// the verdict is traceable — e.g. an UNSTABLE behind a MERGEABLE headline
+	// explains the red-but-non-required checks below.
+	if isOpenVerdict(r.Verdict) && r.MergeStateStatus != "" && r.MergeStateStatus != "UNKNOWN" {
+		fmt.Fprintln(w, s.faint.Render("merge state: "+strings.ToLower(r.MergeStateStatus)))
+	}
 	fmt.Fprintln(w)
 
 	// ok-states come from the Result (set by gate.Evaluate) so the breakdown
@@ -45,9 +51,21 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	if r.IsDraft {
 		row(false, "draft", "marked draft")
 	}
+	if r.Conflict {
+		row(false, "conflict", "merge conflict with base")
+	}
+	if r.Behind {
+		row(false, "branch", "out of date with base")
+	}
 	row(r.ReviewOK, "review", decisionDetail(r.Decision))
 	row(r.ThreadsOK, "threads", threadsDetail(r.Unresolved))
-	row(r.ChecksOK, "checks", checksDetail(r.Failing, r.Pending))
+	row(r.ChecksOK, "checks", checksDetail(r.Failing, r.Pending, r.MergeStateStatus))
+}
+
+// isOpenVerdict reports whether the verdict is for an open PR (not a terminal
+// merged/closed state), where GitHub's merge-state annotation is meaningful.
+func isOpenVerdict(verdict string) bool {
+	return verdict == gate.VerdictMergeable || verdict == gate.VerdictBlocked
 }
 
 func decisionDetail(decision string) string {
@@ -70,7 +88,7 @@ func threadsDetail(unresolved int) string {
 	return plural(unresolved, "thread") + " unresolved"
 }
 
-func checksDetail(failing, pending int) string {
+func checksDetail(failing, pending int, status string) string {
 	if failing == 0 && pending == 0 {
 		return "all passing"
 	}
@@ -81,5 +99,12 @@ func checksDetail(failing, pending int) string {
 	if pending > 0 {
 		parts = append(parts, plural(pending, "check")+" running")
 	}
-	return strings.Join(parts, ", ")
+	detail := strings.Join(parts, ", ")
+	// Under UNSTABLE the reds are real but non-required, so they don't block the
+	// merge — say so, otherwise a ✓ checks row next to "1 check failing" reads as
+	// a contradiction.
+	if status == "UNSTABLE" {
+		detail += " (not required)"
+	}
+	return detail
 }

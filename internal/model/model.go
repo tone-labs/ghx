@@ -9,16 +9,22 @@ import "strings"
 
 // PR is the full review-state snapshot of one pull request.
 type PR struct {
-	Number         int       `json:"number"`
-	Title          string    `json:"title"`
-	URL            string    `json:"url"`
-	State          string    `json:"state"` // OPEN | CLOSED | MERGED
-	IsDraft        bool      `json:"isDraft"`
-	Author         string    `json:"author"`
-	ReviewDecision string    `json:"reviewDecision"` // APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | "" (none)
-	Reviews        []Review  `json:"reviews"`
-	Threads        []Thread  `json:"threads"`
-	Conversation   []Comment `json:"conversation"`
+	Number         int    `json:"number"`
+	Title          string `json:"title"`
+	URL            string `json:"url"`
+	State          string `json:"state"` // OPEN | CLOSED | MERGED
+	IsDraft        bool   `json:"isDraft"`
+	Author         string `json:"author"`
+	ReviewDecision string `json:"reviewDecision"` // APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | "" (none)
+	// Mergeable and MergeStateStatus are GitHub's own merge-button signals — the
+	// authoritative answer that already accounts for branch protection, required
+	// reviews, and *required* checks. The gate anchors its verdict on them rather
+	// than re-deriving mergeability from the finer signals below.
+	Mergeable        string    `json:"mergeable"`        // MERGEABLE | CONFLICTING | UNKNOWN
+	MergeStateStatus string    `json:"mergeStateStatus"` // CLEAN | HAS_HOOKS | UNSTABLE | BLOCKED | BEHIND | DIRTY | DRAFT | UNKNOWN
+	Reviews          []Review  `json:"reviews"`
+	Threads          []Thread  `json:"threads"`
+	Conversation     []Comment `json:"conversation"`
 }
 
 // Review is a submitted PR review (the approval-gate signal).
