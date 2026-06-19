@@ -8,8 +8,9 @@ import (
 	"github.com/tone-labs/ghx/internal/gate"
 )
 
-// GateView renders the mergeability verdict: a headline (MERGEABLE / BLOCKED)
-// followed by a per-dimension breakdown of review, threads, and checks.
+// GateView renders the mergeability verdict: a headline (MERGEABLE / BLOCKED /
+// MERGED / CLOSED) followed by a per-dimension breakdown of review, threads,
+// and checks.
 func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	s := newStyles(w, color)
 
@@ -17,9 +18,17 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	if r.URL != "" {
 		fmt.Fprintln(w, s.faint.Render(r.URL))
 	}
-	if r.Mergeable {
+	// The headline carries the PR's terminal state: merged is purple (a success
+	// state, GitHub-style — not a red blocker), closed is red, and an open PR is
+	// the green/red merge verdict.
+	switch r.Verdict {
+	case gate.VerdictMergeable:
 		fmt.Fprintln(w, s.green.Render("✓ MERGEABLE"))
-	} else {
+	case gate.VerdictMerged:
+		fmt.Fprintln(w, s.purple.Render("● MERGED"))
+	case gate.VerdictClosed:
+		fmt.Fprintln(w, s.red.Render("✗ CLOSED"))
+	default: // BLOCKED
 		fmt.Fprintln(w, s.red.Render("✗ BLOCKED")+s.faint.Render("  ·  "+plural(len(r.Blockers), "blocker")))
 	}
 	fmt.Fprintln(w)
@@ -32,9 +41,6 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 			mark = s.red.Render("✗")
 		}
 		fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
-	}
-	if !r.OpenOK {
-		row(false, "state", strings.ToLower(r.State))
 	}
 	if r.IsDraft {
 		row(false, "draft", "marked draft")
