@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/mattn/go-runewidth"
-	"github.com/muesli/reflow/wordwrap"
 )
 
 // eastAsian measures display width treating ambiguous-width glyphs (arrows like
@@ -21,36 +20,61 @@ var eastAsian = func() *runewidth.Condition {
 // cellWidth is the display width of s in terminal cells (ambiguous = 2).
 func cellWidth(s string) int { return eastAsian.StringWidth(s) }
 
-// flatten collapses a body to a single logical line: newlines and runs of
-// whitespace become single spaces. Bodies are treated as prose, then re-wrapped
-// to the terminal width.
-func flatten(s string) string {
-	return strings.Join(strings.Fields(s), " ")
-}
-
-// wrapBody word-wraps a (flattened) body to width and caps it at maxLines,
-// appending an ellipsis to the last line when content was dropped. Every
-// returned line is hard-clamped to width as a backstop, so unbreakable tokens
-// (long URLs) and glyph-width slop can never overflow. maxLines <= 0 = no cap.
+// wrapBody word-wraps a body to width and caps it at maxLines, appending an
+// ellipsis to the last line when content was dropped. maxLines <= 0 = no cap.
 func wrapBody(body string, width, maxLines int) []string {
 	if width < 10 {
 		width = 10
 	}
-	wrapped := wordwrap.String(flatten(body), width)
-	var lines []string
-	for ln := range strings.SplitSeq(strings.TrimRight(wrapped, "\n"), "\n") {
-		// wordwrap only breaks on spaces, so an unbreakable run — a long URL or
-		// space-free CJK text — can still exceed width. Hard-split those at cell
-		// boundaries so the overflow reflows onto more lines instead of being
-		// silently clamped away (which dropped content with no ellipsis).
-		lines = append(lines, hardWrap(ln, width)...)
-	}
+	lines := wrapText(body, width)
 	if maxLines > 0 && len(lines) > maxLines {
 		kept := lines[:maxLines]
 		const ell = "…"
 		kept[maxLines-1] = clampWidth(kept[maxLines-1], width-cellWidth(ell)) + ell
 		return kept
 	}
+	return lines
+}
+
+// wrapText flattens whitespace, then greedily packs words, breaking at the last
+// word boundary that fits — so a line is never one cell over the limit (the
+// off-by-one that muesli/wordwrap exhibited and that a hard-clamp turned into a
+// mid-word split). A single word wider than width (a long URL or space-free CJK
+// run) is hard-split at cell boundaries via hardWrap rather than overflowing.
+// Every returned line is guaranteed <= width cells.
+func wrapText(body string, width int) []string {
+	var lines []string
+	cur := ""
+	curw := 0
+	flush := func() {
+		if cur != "" {
+			lines = append(lines, cur)
+			cur, curw = "", 0
+		}
+	}
+	for word := range strings.FieldsSeq(body) {
+		ww := cellWidth(word)
+		if ww > width {
+			// ww > width, so hardWrap returns >= 2 chunks: emit all but the last,
+			// keep the last as the running line.
+			flush()
+			chunks := hardWrap(word, width)
+			lines = append(lines, chunks[:len(chunks)-1]...)
+			cur, curw = chunks[len(chunks)-1], cellWidth(chunks[len(chunks)-1])
+			continue
+		}
+		switch {
+		case cur == "":
+			cur, curw = word, ww
+		case curw+1+ww <= width:
+			cur += " " + word
+			curw += 1 + ww
+		default:
+			flush()
+			cur, curw = word, ww
+		}
+	}
+	flush()
 	return lines
 }
 

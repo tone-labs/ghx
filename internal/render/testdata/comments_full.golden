@@ -3,25 +3,24 @@ https://github.com/o/r/pull/42
 CHANGES REQUESTED · 1 unresolved · 2 reviews · open · draft
 
 REVIEWS
-  ✓ ci-bot[bot] (bot)  approved
-  ✗ bob  changes_requested
+  ✓ ci-bot (bot)  approved  ·  1 day ago
+  ✗ bob  changes requested  ·  1 day ago
       Needs work
 
 THREADS · 2
 
   [1] a.ts:72  src
-      bob
+      bob  ·  1 day ago
       Why does this return element-not-found?
-
-   ↳ alice
+    ↳ alice  ·  13 hours ago  ·  author
       Good catch, fixing.
 
   [2] b.ts:10  src  (resolved, outdated)
-      lint-bot[bot] (bot)
+      lint-bot (bot)  ·  1 day ago
       nit: prefer const here for the long explanation that should be truncated in the compact view
 
 CONVERSATION
-  carol
+  carol  ·  12 hours ago
   LGTM overall once threads are addressed.
 
 drill in:  ghx comments 42 --thread <n>
