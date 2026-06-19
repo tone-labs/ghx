@@ -55,6 +55,8 @@ func wrapText(body string, width int) []string {
 	for word := range strings.FieldsSeq(body) {
 		ww := cellWidth(word)
 		if ww > width {
+			// ww > width, so hardWrap returns >= 2 chunks: emit all but the last,
+			// keep the last as the running line.
 			flush()
 			chunks := hardWrap(word, width)
 			lines = append(lines, chunks[:len(chunks)-1]...)
