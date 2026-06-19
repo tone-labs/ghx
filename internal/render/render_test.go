@@ -73,7 +73,28 @@ func TestNoLineOverflow(t *testing.T) {
 	for _, width := range []int{70, 80, 100, 120} {
 		var buf bytes.Buffer
 		Comments(&buf, samplePR(), Options{Width: width, BodyLines: 0, ShowConversation: true})
-		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
+			if w := cellWidth(line); w > width {
+				t.Errorf("width=%d: line exceeds budget (%d cells): %q", width, w, line)
+			}
+		}
+	}
+}
+
+// TestWriteBodyNoOverflow exercises the indent arithmetic directly at narrow
+// widths and with a long author label — the case TestNoLineOverflow can't reach
+// because its unwrapped status line forces widths ≥ ~58. With a 31-cell label,
+// width=40 drives writeBody's body-budget floor (pulling the continuation indent
+// back in); width=50/70 are the normal path. Every emitted line — first and
+// continuation — must stay within the budget.
+func TestWriteBodyNoOverflow(t *testing.T) {
+	const label = "a-very-long-reviewer-username!!" // 31 cells, still < width below
+	body := "This is a multi-line review comment long enough to wrap onto several continuation lines."
+	for _, width := range []int{40, 50, 70} {
+		var buf bytes.Buffer
+		s := newStyles(&buf)
+		writeBody(&buf, s, 6, label, body, width, 0)
+		for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
 			if w := cellWidth(line); w > width {
 				t.Errorf("width=%d: line exceeds budget (%d cells): %q", width, w, line)
 			}

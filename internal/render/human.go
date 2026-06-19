@@ -80,7 +80,6 @@ func Comments(w io.Writer, pr *model.PR, opts Options) {
 		}
 	}
 
-	single := len(pr.Threads) == 1 && pr.Reviews == nil && pr.Conversation == nil
 	if len(pr.Threads) > 0 {
 		hdr := fmt.Sprintf("THREADS · %d", len(pr.Threads))
 		fmt.Fprintln(w, "\n"+s.faint.Render(hdr))
@@ -93,7 +92,7 @@ func Comments(w io.Writer, pr *model.PR, opts Options) {
 
 	renderConversation(w, s, pr, width, opts)
 
-	if len(pr.Threads) > 1 && !single {
+	if len(pr.Threads) > 1 {
 		fmt.Fprintln(w, "\n"+s.faint.Render(fmt.Sprintf("drill in:  ghx comments %d --thread <n>", pr.Number)))
 	}
 }
@@ -175,12 +174,24 @@ func writeBody(w io.Writer, s styles, indent int, label, body string, width, max
 		headPlain = pad
 		headStyled = pad
 	}
-	cont := cellWidth(headPlain)
-	lines := wrapBody(body, width-cont, maxLines)
+	// head is the label's display width; the body wraps in the space the label
+	// leaves. When the label is so wide (or the terminal so narrow) that little
+	// room remains, pull the continuation indent back in so re-indented body
+	// lines never spill past the right edge. The body on the first line is then
+	// clamped to whatever the label actually leaves it.
+	const minBody = 10
+	head := cellWidth(headPlain)
+	cont := head
+	bodyWidth := width - cont
+	if bodyWidth < minBody {
+		bodyWidth = min(minBody, width)
+		cont = width - bodyWidth
+	}
+	lines := wrapBody(body, bodyWidth, maxLines)
 	if len(lines) == 0 {
 		return
 	}
-	fmt.Fprintln(w, headStyled+lines[0])
+	fmt.Fprintln(w, headStyled+clampWidth(lines[0], width-head))
 	for _, ln := range lines[1:] {
 		fmt.Fprintln(w, strings.Repeat(" ", cont)+ln)
 	}
