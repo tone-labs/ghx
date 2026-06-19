@@ -11,3 +11,8 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Personal agent overlays. CLAUDE.local.md is symlinked to AGENTS.local.md so a
+# single uncommitted file feeds both Claude Code and other agents.
+AGENTS.local.md
+CLAUDE.local.md
