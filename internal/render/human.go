@@ -36,7 +36,7 @@ type Options struct {
 // does not).
 type styles struct {
 	bold, faint, file, dir, idx, author lipgloss.Style
-	green, yellow, red                  lipgloss.Style
+	green, yellow, red, purple          lipgloss.Style
 }
 
 func newStyles(w io.Writer, color ColorMode) styles {
@@ -59,6 +59,7 @@ func newStyles(w io.Writer, color ColorMode) styles {
 		green:  r.NewStyle().Foreground(lipgloss.Color("2")),
 		yellow: r.NewStyle().Foreground(lipgloss.Color("3")),
 		red:    r.NewStyle().Foreground(lipgloss.Color("1")),
+		purple: r.NewStyle().Foreground(lipgloss.Color("5")), // merged (GitHub-style)
 	}
 }
 
@@ -126,7 +127,12 @@ func statusLine(s styles, pr *model.PR) string {
 	parts := []string{decisionChip(s, pr.ReviewDecision)}
 	parts = append(parts, s.faint.Render(fmt.Sprintf("%d unresolved", unresolved)))
 	parts = append(parts, s.faint.Render(plural(len(latestPerAuthor(pr.Reviews)), "review")))
-	parts = append(parts, s.faint.Render(strings.ToLower(pr.State)))
+	state := strings.ToLower(pr.State)
+	if pr.State == "MERGED" {
+		parts = append(parts, s.purple.Render(state)) // GitHub-style merged
+	} else {
+		parts = append(parts, s.faint.Render(state))
+	}
 	if pr.IsDraft {
 		parts = append(parts, s.faint.Render("draft"))
 	}
