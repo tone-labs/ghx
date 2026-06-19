@@ -124,23 +124,25 @@ func TestColorMode(t *testing.T) {
 	}
 }
 
+// TestGateGolden feeds real gate.Evaluate output into GateView, so the goldens
+// pin the Evaluate→GateView path end-to-end (not a hand-authored Result).
 func TestGateGolden(t *testing.T) {
-	blocked := gate.Result{
+	blockedPR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		Mergeable: false,
-		Blockers:  []string{"changes requested", "2 threads unresolved", "1 check failing"},
-		Decision:  "CHANGES_REQUESTED", Unresolved: 2, Failing: 1,
+		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED",
+		Threads: []model.Thread{{IsResolved: false}, {IsResolved: false}},
 	}
+	blockedCk := &model.Checks{Counts: map[string]int{}, Failing: []model.Check{{Bucket: "fail"}}}
 	var buf bytes.Buffer
-	GateView(&buf, blocked, ColorAuto)
+	GateView(&buf, gate.Evaluate(blockedPR, blockedCk), ColorAuto)
 	checkGolden(t, "gate_blocked.golden", buf.Bytes())
 
-	mergeable := gate.Result{
+	mergeablePR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		Mergeable: true, Decision: "APPROVED",
+		State: "OPEN", ReviewDecision: "APPROVED",
 	}
 	var buf2 bytes.Buffer
-	GateView(&buf2, mergeable, ColorAuto)
+	GateView(&buf2, gate.Evaluate(mergeablePR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
 	checkGolden(t, "gate_mergeable.golden", buf2.Bytes())
 }
 

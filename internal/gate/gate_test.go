@@ -43,6 +43,8 @@ func TestEvaluate(t *testing.T) {
 		{"failing checks", pr("APPROVED", false), checks(2, 0), false, 1},
 		{"pending checks", pr("APPROVED", false), checks(0, 3), false, 1},
 		{"draft", pr("APPROVED", true), checks(0, 0), false, 1},
+		{"merged PR blocks", &model.PR{Number: 1, State: "MERGED", ReviewDecision: "APPROVED"}, checks(0, 0), false, 1},
+		{"closed PR blocks", &model.PR{Number: 1, State: "CLOSED"}, checks(0, 0), false, 1},
 		{"everything blocks", pr("CHANGES_REQUESTED", true, false), checks(1, 1), false, 5},
 	}
 	for _, tt := range tests {

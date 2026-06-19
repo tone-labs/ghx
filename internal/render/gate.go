@@ -24,6 +24,8 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	}
 	fmt.Fprintln(w)
 
+	// ok-states come from the Result (set by gate.Evaluate) so the breakdown
+	// can't disagree with the headline; only the detail strings are formatted here.
 	row := func(ok bool, label, detail string) {
 		mark := s.green.Render("✓")
 		if !ok {
@@ -31,16 +33,15 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 		}
 		fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
 	}
+	if !r.OpenOK {
+		row(false, "state", strings.ToLower(r.State))
+	}
 	if r.IsDraft {
 		row(false, "draft", "marked draft")
 	}
-	row(!reviewBlocks(r.Decision), "review", decisionDetail(r.Decision))
-	row(r.Unresolved == 0, "threads", threadsDetail(r.Unresolved))
-	row(r.Failing == 0 && r.Pending == 0, "checks", checksDetail(r.Failing, r.Pending))
-}
-
-func reviewBlocks(decision string) bool {
-	return decision == "CHANGES_REQUESTED" || decision == "REVIEW_REQUIRED"
+	row(r.ReviewOK, "review", decisionDetail(r.Decision))
+	row(r.ThreadsOK, "threads", threadsDetail(r.Unresolved))
+	row(r.ChecksOK, "checks", checksDetail(r.Failing, r.Pending))
 }
 
 func decisionDetail(decision string) string {
