@@ -96,7 +96,7 @@ ghx unresolve --thread 1     # reopen thread #1
 ```
 
 Toggle a review thread's resolution state by its **listing number** — the same
-`N` that `ghx comments` shows — so you never copy a node id. Each verb acts on the
+`N` that `ghx comments` shows by default — so you never copy a node id. Each verb acts on the
 threads it can: `resolve` numbers the *unresolved* threads, `unresolve` the
 *resolved* ones. With no `--thread`, it lists those targets (a one-line preview
 each) so you can pick; with `--thread N` it toggles the Nth. These are the first

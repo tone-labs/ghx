@@ -35,8 +35,8 @@ func newThreadToggleCmd(resolve bool) *cobra.Command {
 		Use:   verb + " [PR]",
 		Short: cases(resolve, "Mark a review thread resolved", "Reopen a resolved review thread"),
 		Long: fmt.Sprintf("%s a review thread by its listing number (the same N that\n"+
-			"`ghx comments` shows). With no --thread, lists the %s threads you can %s.",
-			cases(resolve, "Resolve", "Unresolve"), state, verb),
+			"`ghx comments` shows by default). With no --thread, lists the %s threads\n"+
+			"you can %s.", cases(resolve, "Resolve", "Unresolve"), state, verb),
 		Example: fmt.Sprintf("  ghx %s                 # list %s threads, numbered\n"+
 			"  ghx %s --thread 2      # %s thread #2\n"+
 			"  ghx %s 1667 --thread 1 # ...on a specific PR", verb, state, verb, verb, verb),
@@ -70,10 +70,13 @@ func newThreadToggleCmd(resolve bool) *cobra.Command {
 			}
 
 			t := targets[thread-1]
-			if _, err := toggleThread(c, t.ID, resolve); err != nil {
+			// Report the thread's actual resulting state (from the mutation), not
+			// just the intent — so a no-op or surprising API result reads honestly.
+			nowResolved, err := toggleThread(c, t.ID, resolve)
+			if err != nil {
 				return fail(err)
 			}
-			fmt.Printf("✓ %s thread %d  %s\n", pastTense(resolve), thread, threadLoc(t))
+			fmt.Printf("✓ %s thread %d  %s\n", pastTense(nowResolved), thread, threadLoc(t))
 			return nil
 		},
 	}
@@ -147,9 +150,11 @@ func starterSnippet(t model.Thread) string {
 		body = body[:i]
 	}
 	body = strings.TrimSpace(body)
+	// Truncate by rune, not byte, so a multibyte glyph (emoji, CJK) at the
+	// boundary isn't sliced into a replacement char.
 	const max = 60
-	if len(body) > max {
-		body = strings.TrimSpace(body[:max]) + "…"
+	if r := []rune(body); len(r) > max {
+		body = strings.TrimSpace(string(r[:max])) + "…"
 	}
 	if body == "" {
 		return c.Author

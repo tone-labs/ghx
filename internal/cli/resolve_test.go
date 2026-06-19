@@ -67,6 +67,13 @@ func TestStarterSnippet(t *testing.T) {
 		t.Errorf("snippet = %q, want \"ann: first\"", got)
 	}
 
+	// Multibyte body: truncation must land on a rune boundary, never emitting a
+	// replacement char (U+FFFD) from a sliced glyph.
+	cjk := model.Thread{Comments: []model.Comment{{Author: "ann", Body: strings.Repeat("世", 80)}}}
+	if got := starterSnippet(cjk); strings.ContainsRune(got, '�') {
+		t.Errorf("snippet split a multibyte rune: %q", got)
+	}
+
 	// Empty thread → no snippet.
 	if got := starterSnippet(model.Thread{}); got != "" {
 		t.Errorf("empty thread snippet = %q, want \"\"", got)
