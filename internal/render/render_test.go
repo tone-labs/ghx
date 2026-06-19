@@ -154,6 +154,15 @@ func TestGateGolden(t *testing.T) {
 	var buf3 bytes.Buffer
 	GateView(&buf3, gate.Evaluate(mergedPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
 	checkGolden(t, "gate_merged.golden", buf3.Bytes())
+
+	// Closed (unmerged) is terminal too: red CLOSED headline, breakdown shown.
+	closedPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "CLOSED", ReviewDecision: "CHANGES_REQUESTED",
+	}
+	var buf4 bytes.Buffer
+	GateView(&buf4, gate.Evaluate(closedPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_closed.golden", buf4.Bytes())
 }
 
 func TestChecksGolden(t *testing.T) {
