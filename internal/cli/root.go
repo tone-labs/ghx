@@ -3,9 +3,11 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Version is the build version, overridable via -ldflags at release time.
@@ -62,16 +64,42 @@ func fail(err error) int {
 // appears before or after flags) and returns it plus the remaining args for
 // flag parsing. stdlib flag stops at the first non-flag token, so we pull the
 // positional out ourselves to allow `ghx comments 123 --json`.
-func splitPR(args []string) (pr string, rest []string) {
+//
+// valueFlags names the flags that take a separate value token (`--width 100`);
+// without it a numeric value would be mistaken for the PR, leaving the flag with
+// no argument. The `--flag=value` form carries its own value and is unaffected.
+func splitPR(args []string, valueFlags map[string]bool) (pr string, rest []string) {
 	rest = make([]string, 0, len(args))
+	skipValue := false
 	for _, a := range args {
-		if pr == "" && len(a) > 0 && a[0] != '-' && isPRish(a) {
+		switch {
+		case skipValue:
+			// This token is the value of the preceding value-taking flag.
+			skipValue = false
+		case len(a) > 0 && a[0] == '-':
+			name := strings.TrimLeft(a, "-")
+			skipValue = name != "" && !strings.ContainsRune(a, '=') && valueFlags[name]
+		case pr == "" && isPRish(a):
 			pr = a
 			continue
 		}
 		rest = append(rest, a)
 	}
 	return pr, rest
+}
+
+// valueFlagNames returns the names of fs's flags that take a separate value
+// argument — every non-boolean flag. splitPR uses it to tell a flag's value
+// apart from the positional PR.
+func valueFlagNames(fs *flag.FlagSet) map[string]bool {
+	out := map[string]bool{}
+	fs.VisitAll(func(f *flag.Flag) {
+		if bf, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && bf.IsBoolFlag() {
+			return
+		}
+		out[f.Name] = true
+	})
+	return out
 }
 
 func isPRish(s string) bool {

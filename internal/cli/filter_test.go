@@ -46,8 +46,7 @@ func eq(a, b []string) bool {
 
 func TestFilterDefaultUnresolved(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{}.apply(pr, &full)
+	commentFilter{}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-human", "open-outdated-bot"}) {
 		t.Errorf("default should drop resolved, got %v", got)
 	}
@@ -55,8 +54,7 @@ func TestFilterDefaultUnresolved(t *testing.T) {
 
 func TestFilterAllIncludesResolved(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{all: true}.apply(pr, &full)
+	commentFilter{all: true}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-human", "resolved-human", "open-outdated-bot"}) {
 		t.Errorf("--all should keep resolved, got %v", got)
 	}
@@ -64,8 +62,7 @@ func TestFilterAllIncludesResolved(t *testing.T) {
 
 func TestFilterHideOutdated(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{all: true, hideOutdated: true}.apply(pr, &full)
+	commentFilter{all: true, hideOutdated: true}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-human", "resolved-human"}) {
 		t.Errorf("--hide-outdated should drop outdated, got %v", got)
 	}
@@ -73,8 +70,7 @@ func TestFilterHideOutdated(t *testing.T) {
 
 func TestFilterBots(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{all: true, bots: true}.apply(pr, &full)
+	commentFilter{all: true, bots: true}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-outdated-bot"}) {
 		t.Errorf("--bots should keep only bot threads, got %v", got)
 	}
@@ -88,8 +84,7 @@ func TestFilterBots(t *testing.T) {
 
 func TestFilterHumans(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{all: true, humans: true}.apply(pr, &full)
+	commentFilter{all: true, humans: true}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-human", "resolved-human"}) {
 		t.Errorf("--humans should drop bot threads, got %v", got)
 	}
@@ -97,24 +92,33 @@ func TestFilterHumans(t *testing.T) {
 
 func TestFilterAuthorOverridesType(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{all: true, bots: true, author: "human"}.apply(pr, &full)
+	commentFilter{all: true, bots: true, author: "human"}.apply(pr)
 	if got := threadIDs(pr); !eq(got, []string{"open-human", "resolved-human"}) {
 		t.Errorf("--author should override --bots, got %v", got)
 	}
 }
 
-func TestFilterThreadDrillIn(t *testing.T) {
+func TestSelectThread(t *testing.T) {
 	pr := fixture()
-	full := false
-	commentFilter{thread: "resolved-human"}.apply(pr, &full)
-	if got := threadIDs(pr); !eq(got, []string{"resolved-human"}) {
-		t.Errorf("--thread should isolate one thread (even if resolved), got %v", got)
+	commentFilter{all: true}.apply(pr) // 3 threads in the listing
+	if err := selectThread(pr, 2); err != nil {
+		t.Fatalf("selectThread(2): %v", err)
 	}
-	if !full {
-		t.Error("--thread should force full output")
+	if got := threadIDs(pr); !eq(got, []string{"resolved-human"}) {
+		t.Errorf("--thread 2 should isolate the 2nd listed thread, got %v", got)
 	}
 	if pr.Reviews != nil || pr.Conversation != nil {
-		t.Error("--thread should suppress reviews and conversation")
+		t.Error("drill-in should suppress reviews and conversation")
+	}
+}
+
+func TestSelectThreadOutOfRange(t *testing.T) {
+	pr := fixture()
+	commentFilter{}.apply(pr) // 2 unresolved threads
+	if err := selectThread(pr, 5); err == nil {
+		t.Error("selectThread past the end should error")
+	}
+	if err := selectThread(pr, 0); err == nil {
+		t.Error("selectThread(0) should error (1-based)")
 	}
 }
