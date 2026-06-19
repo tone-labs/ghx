@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/tone-labs/ghx/internal/ghclient"
 	"github.com/tone-labs/ghx/internal/model"
@@ -24,6 +25,8 @@ query($owner:String!, $repo:String!, $pr:Int!, $cursor:String) {
       state
       isDraft
       reviewDecision
+      mergeable
+      mergeStateStatus
       author { login }
       reviews(first:100) {
         nodes { author { login __typename } state body submittedAt }
@@ -80,14 +83,16 @@ func (c ghComment) toModel() model.Comment {
 type gqlResp struct {
 	Repository struct {
 		PullRequest struct {
-			Number         int     `json:"number"`
-			Title          string  `json:"title"`
-			URL            string  `json:"url"`
-			State          string  `json:"state"`
-			IsDraft        bool    `json:"isDraft"`
-			ReviewDecision string  `json:"reviewDecision"`
-			Author         ghActor `json:"author"`
-			Reviews        struct {
+			Number           int     `json:"number"`
+			Title            string  `json:"title"`
+			URL              string  `json:"url"`
+			State            string  `json:"state"`
+			IsDraft          bool    `json:"isDraft"`
+			ReviewDecision   string  `json:"reviewDecision"`
+			Mergeable        string  `json:"mergeable"`
+			MergeStateStatus string  `json:"mergeStateStatus"`
+			Author           ghActor `json:"author"`
+			Reviews          struct {
 				Nodes []struct {
 					Author      ghActor `json:"author"`
 					State       string  `json:"state"`
@@ -125,7 +130,7 @@ func FetchPR(c *ghclient.Client, pr int) (*model.PR, error) {
 	first := true
 
 	for {
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"owner":  c.Owner,
 			"repo":   c.Repo,
 			"pr":     pr,
@@ -146,6 +151,8 @@ func FetchPR(c *ghclient.Client, pr int) (*model.PR, error) {
 			out.IsDraft = p.IsDraft
 			out.Author = p.Author.login()
 			out.ReviewDecision = p.ReviewDecision
+			out.Mergeable = p.Mergeable
+			out.MergeStateStatus = p.MergeStateStatus
 
 			for _, r := range p.Reviews.Nodes {
 				out.Reviews = append(out.Reviews, model.Review{
@@ -183,5 +190,54 @@ func FetchPR(c *ghclient.Client, pr int) (*model.PR, error) {
 		cursor = &end
 	}
 
+	// GitHub computes mergeable / mergeStateStatus lazily — the first query on an
+	// open PR often returns UNKNOWN, then a follow-up returns the real value. Only
+	// when it matters (open PR, still unknown), re-query a few times so the gate
+	// gets GitHub's authoritative merge-button state instead of falling back to a
+	// heuristic. Best-effort: a failure or persistent UNKNOWN just leaves the gate
+	// to degrade gracefully.
+	if out.State == "OPEN" && mergeStateUnknown(out.MergeStateStatus) {
+		refreshMergeState(c, pr, out)
+	}
+
 	return out, nil
+}
+
+const (
+	mergeStateRetries = 3
+	mergeStateBackoff = 700 * time.Millisecond
+)
+
+// mergeQuery refetches only the lazily-computed merge-button signals, so a
+// retry doesn't re-paginate the whole PR.
+const mergeQuery = `
+query($owner:String!, $repo:String!, $pr:Int!) {
+  repository(owner:$owner, name:$repo) {
+    pullRequest(number:$pr) { mergeable mergeStateStatus }
+  }
+}`
+
+func mergeStateUnknown(s string) bool { return s == "" || s == "UNKNOWN" }
+
+func refreshMergeState(c *ghclient.Client, pr int, out *model.PR) {
+	vars := map[string]any{"owner": c.Owner, "repo": c.Repo, "pr": pr}
+	for attempt := range mergeStateRetries {
+		// Re-query first: the initial FetchPR query already raced ahead of
+		// GitHub's lazy computation, so this follow-up often returns the real
+		// value immediately. Only back off *between* attempts, never before the
+		// first — otherwise the common case eats a needless 700ms.
+		if attempt > 0 {
+			time.Sleep(mergeStateBackoff)
+		}
+		var resp gqlResp
+		if err := c.GraphQL().Do(mergeQuery, vars, &resp); err != nil {
+			return
+		}
+		p := resp.Repository.PullRequest
+		if !mergeStateUnknown(p.MergeStateStatus) {
+			out.Mergeable = p.Mergeable
+			out.MergeStateStatus = p.MergeStateStatus
+			return
+		}
+	}
 }
