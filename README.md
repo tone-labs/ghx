@@ -62,7 +62,9 @@ ghx checks --exit-code    # exit 8 if any check is failing (for CI/scripts)
 ```
 
 Reuses `gh`'s own status-check rollup (no reimplementation), reshaped into
-bucket counts and failing-check detail with workflow links.
+**colored bucket counts** (failures first — green pass / red fail / yellow
+pending) and failing-check detail with workflow links. Color follows the same
+rules as `comments` (`--color auto|always|never`, `NO_COLOR` honored).
 
 ### `ghx gate`
 

@@ -15,6 +15,7 @@ func newChecksCmd() *cobra.Command {
 		repo     string
 		jsonOut  bool
 		exitCode bool
+		color    colorFlag
 	)
 	cmd := &cobra.Command{
 		Use:     "checks [PR]",
@@ -51,7 +52,7 @@ func newChecksCmd() *cobra.Command {
 					return fail(err)
 				}
 			} else {
-				render.ChecksView(os.Stdout, prNum, ck)
+				render.ChecksView(os.Stdout, prNum, ck, color.mode)
 			}
 
 			// --exit-code: after emitting output, signal red CI via the exit
@@ -68,6 +69,7 @@ func newChecksCmd() *cobra.Command {
 	f := cmd.Flags()
 	f.BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
 	f.BoolVar(&exitCode, "exit-code", false, "exit 8 if any check is failing (output is still printed)")
+	f.Var(&color, "color", "when to use color: auto, always, never")
 	f.StringVarP(&repo, "repo", "R", "", "target repo as owner/repo (default: current repo)")
 	return cmd
 }
