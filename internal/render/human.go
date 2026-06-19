@@ -8,16 +8,27 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
 
 	"github.com/tone-labs/ghx/internal/model"
 )
 
+// ColorMode controls ANSI color in the human view.
+type ColorMode int
+
+const (
+	ColorAuto   ColorMode = iota // color when the writer is a TTY (honors NO_COLOR)
+	ColorAlways                  // force color even when piped (overrides NO_COLOR)
+	ColorNever                   // never emit color
+)
+
 // Options controls the human (non-JSON) comment view.
 type Options struct {
-	Width            int  // explicit wrap width; <= 0 = detect the terminal (full width)
-	BodyLines        int  // max wrapped lines per body; 0 = unlimited
-	ShowConversation bool // expand PR-level conversation (default: collapsed summary)
+	Width            int       // explicit wrap width; <= 0 = detect the terminal (full width)
+	BodyLines        int       // max wrapped lines per body; 0 = unlimited
+	ShowConversation bool      // expand PR-level conversation (default: collapsed summary)
+	Color            ColorMode // when to colorize (default: ColorAuto)
 }
 
 // styles bundles the lipgloss styles for one render, bound to the output writer
@@ -28,8 +39,16 @@ type styles struct {
 	green, yellow, red                  lipgloss.Style
 }
 
-func newStyles(w io.Writer) styles {
+func newStyles(w io.Writer, color ColorMode) styles {
 	r := lipgloss.NewRenderer(w)
+	// auto: lipgloss already detects TTY + honors NO_COLOR. Override only for the
+	// explicit modes, where always wins even over NO_COLOR.
+	switch color {
+	case ColorAlways:
+		r.SetColorProfile(termenv.TrueColor)
+	case ColorNever:
+		r.SetColorProfile(termenv.Ascii)
+	}
 	return styles{
 		bold:   r.NewStyle().Bold(true),
 		faint:  r.NewStyle().Faint(true),
@@ -51,7 +70,7 @@ func newStyles(w io.Writer) styles {
 const rightGutter = 2
 
 func Comments(w io.Writer, pr *model.PR, opts Options) {
-	s := newStyles(w)
+	s := newStyles(w, opts.Color)
 	width := opts.Width
 	if width <= 0 {
 		width = contentWidth(w) - rightGutter

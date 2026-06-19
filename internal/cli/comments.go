@@ -30,6 +30,7 @@ func newCommentsCmd() *cobra.Command {
 		lines        int
 		width        int
 		jsonOut      bool
+		color        colorFlag
 	)
 	cmd := &cobra.Command{
 		Use:     "comments [PR]",
@@ -38,6 +39,12 @@ func newCommentsCmd() *cobra.Command {
 		Long: "Inline review threads (with resolution state), reviews + decision,\n" +
 			"and PR-level conversation. Defaults to the current branch's PR and to\n" +
 			"unresolved threads only.",
+		Example: "  ghx comments                  # current branch's PR, unresolved threads\n" +
+			"  ghx comments 1667 --all       # include resolved threads\n" +
+			"  ghx comments --bots           # only bot-authored items\n" +
+			"  ghx comments --thread 2       # drill into thread #2, full text\n" +
+			"  ghx comments --full           # expand bodies + conversation\n" +
+			"  ghx comments --json | jq .    # machine-readable (full bodies)",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true // parsing done; runtime errors shouldn't dump usage
@@ -82,7 +89,12 @@ func newCommentsCmd() *cobra.Command {
 				}
 				return nil
 			}
-			render.Comments(os.Stdout, pr, render.Options{Width: width, BodyLines: bodyLines, ShowConversation: showConv})
+			render.Comments(os.Stdout, pr, render.Options{
+				Width:            width,
+				BodyLines:        bodyLines,
+				ShowConversation: showConv,
+				Color:            color.mode,
+			})
 			return nil
 		},
 	}
@@ -98,9 +110,41 @@ func newCommentsCmd() *cobra.Command {
 	f.IntVar(&lines, "lines", defaultBodyLines, "max wrapped lines per comment body (0 = unlimited)")
 	f.IntVar(&width, "width", 0, "wrap width (0 = detect terminal width)")
 	f.BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
+	f.Var(&color, "color", "when to use color: auto, always, never")
 	f.StringVarP(&repo, "repo", "R", "", "target repo as owner/repo (default: current repo)")
 	return cmd
 }
+
+// colorFlag is a pflag.Value for --color, parsing auto|always|never into a
+// render.ColorMode. Invalid values fail at parse time (→ usage error, exit 2).
+type colorFlag struct{ mode render.ColorMode }
+
+func (c *colorFlag) String() string {
+	switch c.mode {
+	case render.ColorAlways:
+		return "always"
+	case render.ColorNever:
+		return "never"
+	default:
+		return "auto"
+	}
+}
+
+func (c *colorFlag) Set(s string) error {
+	switch s {
+	case "auto":
+		c.mode = render.ColorAuto
+	case "always":
+		c.mode = render.ColorAlways
+	case "never":
+		c.mode = render.ColorNever
+	default:
+		return fmt.Errorf(`invalid color %q: want "auto", "always", or "never"`, s)
+	}
+	return nil
+}
+
+func (c *colorFlag) Type() string { return "auto|always|never" }
 
 // selectThread reduces pr to the single thread at 1-based index n (its position
 // in the filtered listing) and drops reviews/conversation for a focused view.

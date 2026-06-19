@@ -92,12 +92,33 @@ func TestWriteBodyNoOverflow(t *testing.T) {
 	body := "This is a multi-line review comment long enough to wrap onto several continuation lines."
 	for _, width := range []int{40, 50, 70} {
 		var buf bytes.Buffer
-		s := newStyles(&buf)
+		s := newStyles(&buf, ColorAuto)
 		writeBody(&buf, s, 6, label, body, width, 0)
 		for line := range strings.SplitSeq(strings.TrimRight(buf.String(), "\n"), "\n") {
 			if w := cellWidth(line); w > width {
 				t.Errorf("width=%d: line exceeds budget (%d cells): %q", width, w, line)
 			}
+		}
+	}
+}
+
+// TestColorMode verifies --color plumbing: writing to a (non-TTY) buffer,
+// `auto` and `never` stay plain while `always` forces ANSI escapes.
+func TestColorMode(t *testing.T) {
+	hasANSI := func(s string) bool { return strings.Contains(s, "\x1b[") }
+	cases := []struct {
+		mode    ColorMode
+		wantSeq bool
+	}{
+		{ColorAuto, false},  // non-TTY → no color
+		{ColorNever, false}, // explicitly off
+		{ColorAlways, true}, // forced even when piped
+	}
+	for _, tc := range cases {
+		var buf bytes.Buffer
+		Comments(&buf, samplePR(), Options{Color: tc.mode, BodyLines: defaultLines})
+		if got := hasANSI(buf.String()); got != tc.wantSeq {
+			t.Errorf("Color=%d: ANSI present = %v, want %v", tc.mode, got, tc.wantSeq)
 		}
 	}
 }

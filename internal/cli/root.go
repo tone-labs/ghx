@@ -25,26 +25,41 @@ func (e *cmdError) Unwrap() error { return e.err }
 // fail wraps err as a runtime failure for return from a command's RunE.
 func fail(err error) error { return &cmdError{err} }
 
+// statusError requests a specific exit code with no output — a status signal,
+// not a failure (e.g. `checks --exit-code` when CI is red). Returned from RunE.
+type statusError struct{ code int }
+
+func (e *statusError) Error() string { return "" }
+
+// statusExit makes Execute exit with code and print nothing.
+func statusExit(code int) error { return &statusError{code: code} }
+
 // Execute builds the command tree, runs it, and returns a process exit code.
 func Execute() int {
 	err := newRootCmd().Execute()
-	if err != nil {
+	code, show := resolveExit(err)
+	if show {
 		fmt.Fprintf(os.Stderr, "ghx: %v\n", err)
 	}
-	return exitCode(err)
+	return code
 }
 
-// exitCode maps a command error to a process exit code: 0 success, 1 runtime
-// failure (a *cmdError returned via fail()), 2 usage/flag/unknown-command error
-// (cobra's own errors, which it has already printed usage for).
-func exitCode(err error) int {
+// resolveExit maps a command error to its process exit code and whether to
+// print it: 0 success; 1 runtime failure (*cmdError via fail()); 2 usage/flag/
+// unknown-command error (cobra's own, already-printed-usage errors). A
+// *statusError carries an explicit code and prints nothing.
+func resolveExit(err error) (code int, show bool) {
 	switch {
 	case err == nil:
-		return 0
+		return 0, false
+	case errors.As(err, new(*statusError)):
+		var se *statusError
+		errors.As(err, &se)
+		return se.code, false
 	case errors.As(err, new(*cmdError)):
-		return 1
+		return 1, true
 	default:
-		return 2
+		return 2, true
 	}
 }
 
