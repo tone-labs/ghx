@@ -56,9 +56,10 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	sigRow(w, s, r.ThreadsState, "threads", threadsDetail(r.Unresolved))
 	sigRow(w, s, r.ChecksState, "checks", checksDetail(r.Failing, r.Pending, r.MergeStateStatus))
 
-	// A faint legend the first time advisory signals appear, so the ○ glyph reads
-	// as "related, not blocking" rather than a half-failure.
-	if len(r.Advisory) > 0 {
+	// A faint legend when advisory signals appear, so the ○ glyph reads as
+	// "related, not blocking" rather than a half-failure. Only for open PRs —
+	// "not blocking the merge" is meaningless once a PR is merged/closed.
+	if len(r.Advisory) > 0 && isOpenVerdict(r.Verdict) {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, s.faint.Render("  ○ = advisory: related to the merge, but not blocking it"))
 	}

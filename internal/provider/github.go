@@ -221,8 +221,14 @@ func mergeStateUnknown(s string) bool { return s == "" || s == "UNKNOWN" }
 
 func refreshMergeState(c *ghclient.Client, pr int, out *model.PR) {
 	vars := map[string]any{"owner": c.Owner, "repo": c.Repo, "pr": pr}
-	for range mergeStateRetries {
-		time.Sleep(mergeStateBackoff)
+	for attempt := range mergeStateRetries {
+		// Re-query first: the initial FetchPR query already raced ahead of
+		// GitHub's lazy computation, so this follow-up often returns the real
+		// value immediately. Only back off *between* attempts, never before the
+		// first — otherwise the common case eats a needless 700ms.
+		if attempt > 0 {
+			time.Sleep(mergeStateBackoff)
+		}
 		var resp gqlResp
 		if err := c.GraphQL().Do(mergeQuery, vars, &resp); err != nil {
 			return
