@@ -136,7 +136,7 @@ func TestColorMode(t *testing.T) {
 func TestGateGolden(t *testing.T) {
 	blockedPR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED",
+		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED", MergeStateStatus: "BLOCKED",
 		Threads: []model.Thread{{IsResolved: false}, {IsResolved: false}},
 	}
 	blockedCk := &model.Checks{Counts: map[string]int{}, Failing: []model.Check{{Bucket: "fail"}}}
@@ -146,11 +146,54 @@ func TestGateGolden(t *testing.T) {
 
 	mergeablePR := &model.PR{
 		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
-		State: "OPEN", ReviewDecision: "APPROVED",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "CLEAN",
 	}
 	var buf2 bytes.Buffer
 	GateView(&buf2, gate.Evaluate(mergeablePR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
 	checkGolden(t, "gate_mergeable.golden", buf2.Bytes())
+
+	// UNSTABLE is the key fix: non-required checks are red but the PR still
+	// merges, so the verdict is MERGEABLE with the reds flagged "not required".
+	unstablePR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "UNSTABLE",
+	}
+	unstableCk := &model.Checks{Counts: map[string]int{"pending": 1}, Failing: []model.Check{{Bucket: "fail"}}}
+	var bufU bytes.Buffer
+	GateView(&bufU, gate.Evaluate(unstablePR, unstableCk), ColorAuto)
+	checkGolden(t, "gate_unstable.golden", bufU.Bytes())
+
+	// DIRTY surfaces the conflict row; CONFLICTING mergeable corroborates it.
+	conflictPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "DIRTY", Mergeable: "CONFLICTING",
+	}
+	var bufC bytes.Buffer
+	GateView(&bufC, gate.Evaluate(conflictPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_conflict.golden", bufC.Bytes())
+
+	// The canonical squishy case: gated on an approval that hasn't landed, with
+	// unresolved threads alongside. Review is the firm gate (✗); the threads are
+	// advisory (○) — surfaced, but not blocking, for a consumer to weigh.
+	approvalPendingPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "REVIEW_REQUIRED", MergeStateStatus: "BLOCKED",
+		Threads: []model.Thread{{IsResolved: false}, {IsResolved: false}},
+	}
+	var bufA bytes.Buffer
+	GateView(&bufA, gate.Evaluate(approvalPendingPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_approval_pending.golden", bufA.Bytes())
+
+	// Mergeable per GitHub, but a human left threads open — must still surface
+	// them (○), not hide them behind the ✓ headline.
+	mergeableOpenThreadsPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED", MergeStateStatus: "CLEAN",
+		Threads: []model.Thread{{IsResolved: false}},
+	}
+	var bufM bytes.Buffer
+	GateView(&bufM, gate.Evaluate(mergeableOpenThreadsPR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_mergeable_threads.golden", bufM.Bytes())
 
 	// Merged is terminal: purple MERGED headline, breakdown still shown.
 	mergedPR := &model.PR{

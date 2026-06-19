@@ -9,8 +9,10 @@ import (
 )
 
 // GateView renders the mergeability verdict: a headline (MERGEABLE / BLOCKED /
-// MERGED / CLOSED) followed by a per-dimension breakdown of review, threads,
-// and checks.
+// MERGED / CLOSED) anchored on GitHub's merge-button state, followed by a
+// three-state breakdown of the finer signals. A ✗ row is a firm gate, a ○ row is
+// advisory (related but not blocking — surfaced for a human or an automated
+// agent to weigh), a ✓ row is clear.
 func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	s := newStyles(w, color)
 
@@ -31,23 +33,56 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	default: // BLOCKED
 		fmt.Fprintln(w, s.red.Render("✗ BLOCKED")+s.faint.Render("  ·  "+plural(len(r.Blockers), "blocker")))
 	}
+	// Show GitHub's own merge-button state (the anchor) when it gave us one, so
+	// the verdict is traceable — e.g. an UNSTABLE behind a MERGEABLE headline
+	// explains the red-but-non-required checks below.
+	if isOpenVerdict(r.Verdict) && r.MergeStateStatus != "" && r.MergeStateStatus != "UNKNOWN" {
+		fmt.Fprintln(w, s.faint.Render("merge state: "+strings.ToLower(r.MergeStateStatus)))
+	}
 	fmt.Fprintln(w)
 
-	// ok-states come from the Result (set by gate.Evaluate) so the breakdown
+	// Signal states come from the Result (set by gate.Evaluate) so the breakdown
 	// can't disagree with the headline; only the detail strings are formatted here.
-	row := func(ok bool, label, detail string) {
-		mark := s.green.Render("✓")
-		if !ok {
-			mark = s.red.Render("✗")
-		}
-		fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
-	}
 	if r.IsDraft {
-		row(false, "draft", "marked draft")
+		sigRow(w, s, gate.SignalBlock, "draft", "marked draft")
 	}
-	row(r.ReviewOK, "review", decisionDetail(r.Decision))
-	row(r.ThreadsOK, "threads", threadsDetail(r.Unresolved))
-	row(r.ChecksOK, "checks", checksDetail(r.Failing, r.Pending))
+	if r.Conflict {
+		sigRow(w, s, gate.SignalBlock, "conflict", "merge conflict with base")
+	}
+	if r.Behind {
+		sigRow(w, s, gate.SignalBlock, "branch", "out of date with base")
+	}
+	sigRow(w, s, r.ReviewState, "review", decisionDetail(r.Decision))
+	sigRow(w, s, r.ThreadsState, "threads", threadsDetail(r.Unresolved))
+	sigRow(w, s, r.ChecksState, "checks", checksDetail(r.Failing, r.Pending, r.MergeStateStatus))
+
+	// A faint legend when advisory signals appear, so the ○ glyph reads as
+	// "related, not blocking" rather than a half-failure. Only for open PRs —
+	// "not blocking the merge" is meaningless once a PR is merged/closed.
+	if len(r.Advisory) > 0 && isOpenVerdict(r.Verdict) {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, s.faint.Render("  ○ = advisory: related to the merge, but not blocking it"))
+	}
+}
+
+// sigRow renders one breakdown line with the glyph for its three-state signal.
+func sigRow(w io.Writer, s styles, signal, label, detail string) {
+	var mark string
+	switch signal {
+	case gate.SignalBlock:
+		mark = s.red.Render("✗")
+	case gate.SignalNote:
+		mark = s.yellow.Render("○")
+	default:
+		mark = s.green.Render("✓")
+	}
+	fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
+}
+
+// isOpenVerdict reports whether the verdict is for an open PR (not a terminal
+// merged/closed state), where GitHub's merge-state annotation is meaningful.
+func isOpenVerdict(verdict string) bool {
+	return verdict == gate.VerdictMergeable || verdict == gate.VerdictBlocked
 }
 
 func decisionDetail(decision string) string {
@@ -70,7 +105,7 @@ func threadsDetail(unresolved int) string {
 	return plural(unresolved, "thread") + " unresolved"
 }
 
-func checksDetail(failing, pending int) string {
+func checksDetail(failing, pending int, status string) string {
 	if failing == 0 && pending == 0 {
 		return "all passing"
 	}
@@ -81,5 +116,11 @@ func checksDetail(failing, pending int) string {
 	if pending > 0 {
 		parts = append(parts, plural(pending, "check")+" running")
 	}
-	return strings.Join(parts, ", ")
+	detail := strings.Join(parts, ", ")
+	// Under UNSTABLE the reds are real but non-required, so they don't block the
+	// merge — say so, otherwise a ○ checks row reads as ambiguous.
+	if status == "UNSTABLE" {
+		detail += " (not required)"
+	}
+	return detail
 }

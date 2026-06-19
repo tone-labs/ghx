@@ -1,7 +1,10 @@
 #42  Add xpath support
 https://github.com/o/r/pull/42
-● MERGED
+✓ MERGEABLE
+merge state: clean
 
   ✓ review   approved
   ○ threads  1 thread unresolved
   ✓ checks   all passing
+
+  ○ = advisory: related to the merge, but not blocking it

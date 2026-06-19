@@ -74,11 +74,15 @@ ghx gate 1667 --json      # structured verdict
 ghx gate && gh pr merge   # gate before merging
 ```
 
-Unions the **review decision**, **unresolved threads**, and **CI checks** into
-one verdict — `MERGEABLE`, or `BLOCKED` with the blockers listed. Exits `8` when
-blocked (no flag needed — the verdict is the command's purpose), so it gates a
-merge or a CI step. Catches the easy-to-miss case of an *approved* PR still held
-up by an open thread or a still-running check.
+Anchors on GitHub's own merge-button state (`mergeStateStatus`) — which already
+accounts for **branch protection**, **required reviews**, and **required** checks
+— then explains it with the finer signals (review decision, unresolved threads,
+CI checks) as a `MERGEABLE` / `BLOCKED` verdict with blockers listed. Because the
+anchor is the merge button itself, the verdict agrees with it: a red *non-required*
+check (GitHub's `UNSTABLE`) doesn't block, a merge conflict or out-of-date branch
+does. When GitHub hasn't computed a state yet it falls back to a best-effort union
+of the finer signals. Exits `8` when blocked (no flag needed — the verdict is the
+command's purpose), so it gates a merge or a CI step.
 
 ## Scripting
 
@@ -93,7 +97,7 @@ ghx checks  --json | jq -r '.failing[] | "\(.name)\t\(.link)"'
 Exit codes: `0` success, `1` runtime error (no PR found, `gh` failure), `2`
 usage/flag error. With `--exit-code`, `ghx checks` additionally returns `8` (the
 `gh pr checks` convention — distinct from `1`/`2`) when any check is failing, so
-CI gates and the `/scout` flow can branch on status without parsing JSON. `ghx
+CI gates and automation can branch on status without parsing JSON. `ghx
 gate` returns `8` when the PR is blocked — no flag needed, since the verdict is
 the whole point of the command.
 

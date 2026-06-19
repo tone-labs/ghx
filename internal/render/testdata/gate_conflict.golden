@@ -1,8 +1,9 @@
 #42  Add xpath support
 https://github.com/o/r/pull/42
-✓ MERGEABLE
-merge state: clean
+✗ BLOCKED  ·  1 blocker
+merge state: dirty
 
+  ✗ conflict merge conflict with base
   ✓ review   approved
   ✓ threads  all resolved
   ✓ checks   all passing
