@@ -1,49 +1,79 @@
 # ghx — roadmap
 
-A living, internal prioritization pass. The *why* behind it lives in
-[`vision.md`](./vision.md); this is the *what next*. It applies the vision's
-design method — the paper-cut inventory — and sorts the surface practically.
-Ticket IDs (`TON-…`) are internal Linear references.
+A living, internal prioritization pass. The *why* lives in [`vision.md`](./vision.md);
+this is the *what next*. Ticket IDs (`TON-…`) are internal Linear references.
+
+It is grounded in a survey of what the GitHub web UI does versus what `gh` actually
+does (introspected against `gh` 2.93). The point: not everything annoying in the web
+UI is a `gh` *capability* gap. Sorting honestly is what keeps ghx aimed at real
+differentiation instead of re-wrapping commands `gh` already ships.
 
 ## The bar
 
-Not 100% coverage of the GitHub web UI — the asymptote costs more than it returns.
-Target: **open the web UI at most about once a week.** Win the daily paper cuts;
-leave the rare admin to the browser.
+Not 100% coverage of the web UI — the asymptote costs more than it returns. Target:
+**open the web UI at most about once a week.** Win the daily friction; leave the rare
+admin to the browser.
 
-## The 40% gap, prioritized
+## Three buckets
 
-### Tier 1 — the daily paper cuts (highest leverage)
+Every web-UI capability falls into one of these. Only **A** is real differentiation.
 
-| Paper cut ("I open the UI to…") | ghx today | Work |
-| --- | --- | --- |
-| Read inline threads + conversation + review decision together | ✅ `ghx comments` | done |
-| See CI status / what failed | ✅ `ghx checks` | done |
-| Know if it can merge / what's blocking | ⚠️ `ghx gate` (verdict is a heuristic) | **TON-49** — make it honest vs real merge rules |
-| **Rerun a flaky / failed check** without the dropdown dance | ❌ | **new:** `ghx rerun` (operationalize `gh run rerun --failed`) |
-| **Read a failing check's log** without the scroll-jack | ❌ | **new:** `ghx logs <check>` / `ghx checks --logs` |
+- **A — `gh` genuinely can't or won't.** The true UI > `gh` capability gap. ghx's turf.
+- **B — `gh` can, but awkwardly / not PR-aware.** Ergonomics. ghx adds *convenience*,
+  not capability — and we say so. Quick wins, honestly labeled.
+- **C — `gh` does fine.** Leave it. Wrapping it is noise.
 
-### Tier 2 — frequent, but partly gh-covered or heavier
+## The survey
 
-| Paper cut | ghx today | Work |
-| --- | --- | --- |
-| See the diff / files changed | ❌ (`gh pr diff` exists, ~ok) | evaluate: does ghx add value (diff + threads inline)? else defer |
-| Resolve / unresolve a thread (operational write) | ❌ | **TON-52** (operational-write half) |
-| See requested reviewers / decision rollup detail | partial (`gate` has decision) | small surfacing add |
+| Web UI capability | `gh` today | Bucket | ghx stance |
+| --- | --- | --- | --- |
+| Inline review **threads w/ resolution + outdated state** | `pr view --comments` flattens; no resolve state | **A** | ✅ done (`ghx comments`) |
+| **Synthesized "what's blocking merge"** verdict | pieces only (`pr view --json reviewDecision,mergeStateStatus,statusCheckRollup` + `pr checks --required`); no single verdict | **A** (synthesis) | ⚠️ `ghx gate` skeleton → **TON-49** makes it honest |
+| **Resolve / unresolve** a thread | ❌ none (GraphQL only) | **A** (write) | gap → TON-52 (operational write) |
+| **Compose inline / multi-comment review** (file:line) | ❌ `pr review` is PR-level only | **A** (write, content) | gap → agent-driven / TON-52 (content write) |
+| **Diff with review threads in context** | `pr diff` shows diff; no threads/annotations overlay | **A** (heavy) | unbuilt frontier |
+| Inline check annotations on diff lines; suggested changes; "viewed" tracking | ❌ | **A** (niche) | low value in a CLI; skip for now |
+| **Rerun failed / flaky checks** | ✅ `gh run rerun --failed` (needs run-id) | **B** | `ghx rerun` = PR-aware wrapper |
+| **Read a failing check's log** | ✅ `gh run view --log-failed` (needs run-id) | **B** | `ghx logs` = PR-aware wrapper |
+| Required-vs-optional checks | ✅ `gh pr checks --required` | **B** | `ghx gate` should *consume* this (feeds TON-49) |
+| Checks rollup / what failed | ✅ `gh pr checks` | **B/C** | ✅ `ghx checks` (nicer shape) |
+| Merge; edit title/body/labels/reviewers; ready/draft; update-branch; PR-level comment & approve; basic diff; artifacts; cancel; watch | ✅ `pr merge` / `pr edit` / `pr ready` / `pr update-branch` / `pr comment` / `pr review` / `pr diff` / `run download` / `run cancel` / `run watch` | **C** | leave to `gh` |
 
-### Tier 3 — rare; leave to gh/browser (does not count against the bar)
+## What the survey corrected
 
-- Merge the PR — `gh pr merge` from the terminal is *not* "opening the UI." Fine.
-- Edit PR metadata, labels, linked issues — rare, gh covers it.
-- Submit review content / replies — the **agent** drives these (or **TON-52**'s
-  content-write half). Not native-ghx-urgent.
+- **`ghx rerun` / `ghx logs` are bucket B, not Tier-1 capability gaps.** `gh` already
+  does the rerun and the log-read; the web-UI scroll-jack and buried dropdown are *UI*
+  pains `gh` itself already escaped. ghx's value is narrow: collapse *check-name-on-this-
+  PR* → action in one step, without hand-mapping check → run-id. Real, but ergonomics.
+- **The genuine unbuilt *capability* frontier is the writes + the diff overlay** —
+  resolve/unresolve, inline review composition, diff-with-threads. Heavier, partly
+  agent-territory. This is the honest "40% the UI does and `gh` can't."
+- **ghx already captured the *cheap* bucket-A gaps** — threads-with-state (read) and the
+  merge verdict. What's left is ergonomics polish or genuinely heavy/write work.
+- **TON-49 is a synthesis job, not a data-access one.** Everything the honest gate needs
+  is reachable today; `gh` just never unions it into a verdict. Highest-value real work.
 
-## Implications for the backlog
+## Priority (re-derived from the survey)
 
-- Split **TON-52** in two: *operational* writes (rerun, resolve — high paper-cut
-  value, near-term) vs *content* writes (reviews/replies — agent-driven, lower
-  native priority).
-- File two **new** Tier-1 candidates not yet ticketed: `ghx rerun`, `ghx logs`.
-- **TON-49** is reframed from "credibility nice-to-have" to Tier-1 daily-path work.
-- The README's current "views gh leaves out" framing undersells the vision; reframe
-  it around the north star at go-public (**TON-46**).
+1. **TON-49 — honest merge gate.** Real bucket-A synthesis gap, high value, data already
+   reachable. The single best thing on the board.
+2. **Writes story.** Real bucket-A capability gap. Split by blast radius:
+   - *Operational* writes — resolve/unresolve (TON-52 operational half). Near-term.
+   - *Content* writes — inline / multi-comment review composition (TON-52 content half).
+     Heavier; largely agent-driven.
+3. **`ghx rerun` / `ghx logs` — ergonomics quick wins.** File as bucket-B, labeled as
+   convenience over `gh`, not gap-filling. Cheap, pleasant, not differentiation.
+4. **Diff-with-threads overlay.** Real but heavy bucket-A; defer until the cheaper gaps
+   are closed and there's a clear design.
+5. **Leave to `gh`.** Everything in bucket C. Not ghx's job.
+
+## Backlog implications
+
+- **Split TON-52** into operational writes (resolve — bucket A, near-term) vs content
+  writes (inline review composition — bucket A, agent-driven, heavier).
+- **File `ghx rerun` + `ghx logs`** as bucket-B ergonomics tickets — explicitly *not*
+  sold as filling a `gh` gap.
+- **TON-49** reframed from "credibility nice-to-have" to the top real-work item, and
+  clarified as synthesis (consume `pr checks --required`, `mergeStateStatus`, etc.).
+- **README** still uses the older "views gh leaves out" framing; reframe around the
+  north star at go-public (**TON-46**).
