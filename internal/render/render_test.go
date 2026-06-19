@@ -181,8 +181,24 @@ func TestChecksGolden(t *testing.T) {
 		},
 	}
 	var buf bytes.Buffer
-	ChecksView(&buf, 42, ck)
+	ChecksView(&buf, 42, ck, ColorAuto)
 	checkGolden(t, "checks.golden", buf.Bytes())
+}
+
+func TestChecksColor(t *testing.T) {
+	ck := &model.Checks{
+		Counts: map[string]int{"pass": 1, "fail": 1}, Total: 2,
+		Failing: []model.Check{{Name: "lint", Bucket: "fail"}},
+	}
+	var on, off bytes.Buffer
+	ChecksView(&on, 1, ck, ColorAlways)
+	ChecksView(&off, 1, ck, ColorNever)
+	if !strings.Contains(on.String(), "\x1b[") {
+		t.Error("ColorAlways should emit ANSI")
+	}
+	if strings.Contains(off.String(), "\x1b[") {
+		t.Error("ColorNever should not emit ANSI")
+	}
 }
 
 func checkGolden(t *testing.T, name string, got []byte) {
