@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tone-labs/ghx/internal/gate"
 	"github.com/tone-labs/ghx/internal/model"
 )
 
@@ -121,6 +122,28 @@ func TestColorMode(t *testing.T) {
 			t.Errorf("Color=%d: ANSI present = %v, want %v", tc.mode, got, tc.wantSeq)
 		}
 	}
+}
+
+// TestGateGolden feeds real gate.Evaluate output into GateView, so the goldens
+// pin the Evaluate→GateView path end-to-end (not a hand-authored Result).
+func TestGateGolden(t *testing.T) {
+	blockedPR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "CHANGES_REQUESTED",
+		Threads: []model.Thread{{IsResolved: false}, {IsResolved: false}},
+	}
+	blockedCk := &model.Checks{Counts: map[string]int{}, Failing: []model.Check{{Bucket: "fail"}}}
+	var buf bytes.Buffer
+	GateView(&buf, gate.Evaluate(blockedPR, blockedCk), ColorAuto)
+	checkGolden(t, "gate_blocked.golden", buf.Bytes())
+
+	mergeablePR := &model.PR{
+		Number: 42, Title: "Add xpath support", URL: "https://github.com/o/r/pull/42",
+		State: "OPEN", ReviewDecision: "APPROVED",
+	}
+	var buf2 bytes.Buffer
+	GateView(&buf2, gate.Evaluate(mergeablePR, &model.Checks{Counts: map[string]int{}}), ColorAuto)
+	checkGolden(t, "gate_mergeable.golden", buf2.Bytes())
 }
 
 func TestChecksGolden(t *testing.T) {
