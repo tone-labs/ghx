@@ -5,4 +5,6 @@ merge state: unstable
 
   ✓ review   approved
   ✓ threads  all resolved
-  ✓ checks   1 check failing, 1 check running (not required)
+  ○ checks   1 check failing, 1 check running (not required)
+
+  ○ = advisory: related to the merge, but not blocking it

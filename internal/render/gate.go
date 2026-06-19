@@ -9,8 +9,10 @@ import (
 )
 
 // GateView renders the mergeability verdict: a headline (MERGEABLE / BLOCKED /
-// MERGED / CLOSED) followed by a per-dimension breakdown of review, threads,
-// and checks.
+// MERGED / CLOSED) anchored on GitHub's merge-button state, followed by a
+// three-state breakdown of the finer signals. A ✗ row is a firm gate, a ○ row is
+// advisory (related but not blocking — surfaced for a human or an automated
+// agent to weigh), a ✓ row is clear.
 func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	s := newStyles(w, color)
 
@@ -39,27 +41,41 @@ func GateView(w io.Writer, r gate.Result, color ColorMode) {
 	}
 	fmt.Fprintln(w)
 
-	// ok-states come from the Result (set by gate.Evaluate) so the breakdown
+	// Signal states come from the Result (set by gate.Evaluate) so the breakdown
 	// can't disagree with the headline; only the detail strings are formatted here.
-	row := func(ok bool, label, detail string) {
-		mark := s.green.Render("✓")
-		if !ok {
-			mark = s.red.Render("✗")
-		}
-		fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
-	}
 	if r.IsDraft {
-		row(false, "draft", "marked draft")
+		sigRow(w, s, gate.SignalBlock, "draft", "marked draft")
 	}
 	if r.Conflict {
-		row(false, "conflict", "merge conflict with base")
+		sigRow(w, s, gate.SignalBlock, "conflict", "merge conflict with base")
 	}
 	if r.Behind {
-		row(false, "branch", "out of date with base")
+		sigRow(w, s, gate.SignalBlock, "branch", "out of date with base")
 	}
-	row(r.ReviewOK, "review", decisionDetail(r.Decision))
-	row(r.ThreadsOK, "threads", threadsDetail(r.Unresolved))
-	row(r.ChecksOK, "checks", checksDetail(r.Failing, r.Pending, r.MergeStateStatus))
+	sigRow(w, s, r.ReviewState, "review", decisionDetail(r.Decision))
+	sigRow(w, s, r.ThreadsState, "threads", threadsDetail(r.Unresolved))
+	sigRow(w, s, r.ChecksState, "checks", checksDetail(r.Failing, r.Pending, r.MergeStateStatus))
+
+	// A faint legend the first time advisory signals appear, so the ○ glyph reads
+	// as "related, not blocking" rather than a half-failure.
+	if len(r.Advisory) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, s.faint.Render("  ○ = advisory: related to the merge, but not blocking it"))
+	}
+}
+
+// sigRow renders one breakdown line with the glyph for its three-state signal.
+func sigRow(w io.Writer, s styles, signal, label, detail string) {
+	var mark string
+	switch signal {
+	case gate.SignalBlock:
+		mark = s.red.Render("✗")
+	case gate.SignalNote:
+		mark = s.yellow.Render("○")
+	default:
+		mark = s.green.Render("✓")
+	}
+	fmt.Fprintf(w, "  %s %-8s %s\n", mark, label, s.faint.Render(detail))
 }
 
 // isOpenVerdict reports whether the verdict is for an open PR (not a terminal
@@ -101,8 +117,7 @@ func checksDetail(failing, pending int, status string) string {
 	}
 	detail := strings.Join(parts, ", ")
 	// Under UNSTABLE the reds are real but non-required, so they don't block the
-	// merge — say so, otherwise a ✓ checks row next to "1 check failing" reads as
-	// a contradiction.
+	// merge — say so, otherwise a ○ checks row reads as ambiguous.
 	if status == "UNSTABLE" {
 		detail += " (not required)"
 	}

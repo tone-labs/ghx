@@ -97,7 +97,7 @@ ghx checks  --json | jq -r '.failing[] | "\(.name)\t\(.link)"'
 Exit codes: `0` success, `1` runtime error (no PR found, `gh` failure), `2`
 usage/flag error. With `--exit-code`, `ghx checks` additionally returns `8` (the
 `gh pr checks` convention — distinct from `1`/`2`) when any check is failing, so
-CI gates and the `/scout` flow can branch on status without parsing JSON. `ghx
+CI gates and automation can branch on status without parsing JSON. `ghx
 gate` returns `8` when the PR is blocked — no flag needed, since the verdict is
 the whole point of the command.
 
