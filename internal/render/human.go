@@ -94,9 +94,7 @@ func Comments(w io.Writer, pr *model.PR, opts Options) {
 			g := reviewGlyph(s, r.State)
 			fmt.Fprintf(w, "  %s %s%s  %s\n", g, s.author.Render(r.Author), botTag(s, r.IsBot),
 				s.faint.Render(strings.ToLower(r.State)))
-			if body := flatten(r.Body); body != "" {
-				writeBody(w, s, 6, "", body, width, opts.BodyLines)
-			}
+			writeBodyLines(w, 6, r.Body, width, opts.BodyLines)
 		}
 	}
 
@@ -178,48 +176,39 @@ func renderThread(w io.Writer, s styles, n int, t model.Thread, width, bodyLines
 	head += threadBadge(s, t)
 	fmt.Fprintln(w, "\n"+head)
 	for i, c := range t.Comments {
-		marker := ""
 		if i > 0 {
-			marker = "↳ "
+			fmt.Fprintln(w) // separate stacked comments
 		}
-		writeBody(w, s, 6, marker+c.Author+botTagPlain(c.IsBot), c.Body, width, bodyLines)
+		writeComment(w, s, 6, i > 0, c.Author, c.IsBot, c.Body, width, bodyLines)
 	}
 }
 
-// writeBody prints "<indent><label>  <wrapped body>" with continuation lines
-// aligned under the body. label is the (plain) author/marker prefix; pass "" to
-// indent the body with no label.
-func writeBody(w io.Writer, s styles, indent int, label, body string, width, maxLines int) {
-	pad := strings.Repeat(" ", indent)
-	var headPlain, headStyled string
-	if label != "" {
-		headPlain = pad + label + "  "
-		headStyled = pad + s.author.Render(label) + "  "
-	} else {
-		headPlain = pad
-		headStyled = pad
-	}
-	// head is the label's display width; the body wraps in the space the label
-	// leaves. When the label is so wide (or the terminal so narrow) that little
-	// room remains, pull the continuation indent back in so re-indented body
-	// lines never spill past the right edge. The body on the first line is then
-	// clamped to whatever the label actually leaves it.
-	const minBody = 10
-	head := cellWidth(headPlain)
-	cont := head
-	bodyWidth := width - cont
-	if bodyWidth < minBody {
-		bodyWidth = min(minBody, width)
-		cont = width - bodyWidth
-	}
-	lines := wrapBody(body, bodyWidth, maxLines)
-	if len(lines) == 0 {
+// writeBodyLines wraps body to the available width and prints it at a fixed
+// indent, with no author label. Used where the caller prints its own header
+// (e.g. a review's glyph line).
+func writeBodyLines(w io.Writer, indent int, body string, width, maxLines int) {
+	if strings.TrimSpace(body) == "" {
 		return
 	}
-	fmt.Fprintln(w, headStyled+clampWidth(lines[0], width-head))
-	for _, ln := range lines[1:] {
-		fmt.Fprintln(w, strings.Repeat(" ", cont)+ln)
+	pad := strings.Repeat(" ", indent)
+	for _, ln := range wrapBody(body, width-indent, maxLines) {
+		fmt.Fprintln(w, pad+ln)
 	}
+}
+
+// writeComment prints a comment GitHub-style: a bold author header on its own
+// line (replies get a "↳" in the left gutter), then the wrapped body at a fixed
+// indent. Because the body indent is constant, body text never staggers with
+// author-name length, and the body always gets width-indent to wrap in.
+func writeComment(w io.Writer, s styles, indent int, reply bool, author string, isBot bool, body string, width, maxLines int) {
+	header := strings.Repeat(" ", indent)
+	if reply && indent >= 3 {
+		// "↳ " (3 cells under the East-Asian-width convention) hangs in the
+		// gutter so the author name still starts at `indent`.
+		header = strings.Repeat(" ", indent-3) + s.faint.Render("↳ ")
+	}
+	fmt.Fprintln(w, header+s.author.Render(author)+botTag(s, isBot))
+	writeBodyLines(w, indent, body, width, maxLines)
 }
 
 func renderConversation(w io.Writer, s styles, pr *model.PR, width int, opts Options) {
@@ -241,8 +230,11 @@ func renderConversation(w io.Writer, s styles, pr *model.PR, width int, opts Opt
 		return
 	}
 	fmt.Fprintln(w, "\n"+s.faint.Render("CONVERSATION"))
-	for _, c := range pr.Conversation {
-		writeBody(w, s, 2, c.Author+botTagPlain(c.IsBot), c.Body, width, opts.BodyLines)
+	for i, c := range pr.Conversation {
+		if i > 0 {
+			fmt.Fprintln(w) // separate stacked comments
+		}
+		writeComment(w, s, 2, false, c.Author, c.IsBot, c.Body, width, opts.BodyLines)
 	}
 }
 
@@ -293,13 +285,6 @@ func plural(n int, noun string) string {
 		return fmt.Sprintf("1 %s", noun)
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
-}
-
-func botTagPlain(b bool) string {
-	if b {
-		return " (bot)"
-	}
-	return ""
 }
 
 // latestPerAuthor keeps each author's most recently submitted review.
