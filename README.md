@@ -201,10 +201,13 @@ go install github.com/tone-labs/ghx@latest    # needs the Go toolchain; lands in
 go build -o ghx . && mv ghx ~/.local/bin/
 ```
 
+Prefer a binary? Prebuilt archives for macOS and Linux (amd64/arm64), with
+checksums, are attached to every
+[release](https://github.com/tone-labs/ghx/releases/latest).
+
 The [Homebrew tap](https://github.com/tone-labs/homebrew-tap) builds from source
 (no macOS notarization prompt) and pulls in `gh` automatically; `brew install
 --HEAD tone-labs/tap/ghx` tracks `main`. The `go` paths need the Go toolchain.
-Prebuilt release binaries are still on the [roadmap](docs/roadmap.md).
 
 Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
 (`gh auth status`) — `ghx` inherits gh's auth, host, and config via

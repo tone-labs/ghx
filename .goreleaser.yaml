@@ -1,0 +1,40 @@
+# GoReleaser builds the prebuilt binaries attached to each GitHub release.
+# Triggered by .github/workflows/release.yml on a `v*` tag push.
+# Validate locally without publishing: `goreleaser release --snapshot --clean`.
+version: 2
+
+project_name: ghx
+
+builds:
+  - id: ghx
+    main: .
+    binary: ghx
+    env:
+      - CGO_ENABLED=0 # static binaries: drop into scratch Docker, alpine, etc.
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    # Inject the version the same way the Homebrew formula does — a plain
+    # `go build` isn't `go install module@vX`, so the build-info fallback in
+    # cli.version() would report "dev" without this.
+    ldflags:
+      - -s -w -X github.com/tone-labs/ghx/internal/cli.Version={{ .Tag }}
+
+archives:
+  - id: ghx
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  draft: false

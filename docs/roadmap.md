@@ -75,5 +75,6 @@ Every web-UI capability falls into one of these. Only **A** is real differentiat
 - **`ghx rerun` + `ghx logs`** — bucket-B ergonomics, explicitly *not* sold as filling a
   `gh` gap.
 - **Diff-with-threads overlay** — the heavy bucket-A frontier.
-- **Distribution** — Homebrew tap shipped (`brew install tone-labs/tap/ghx`); prebuilt
-  release binaries via GoReleaser are the follow-up (CI/Docker/no-brew installs).
+- **Distribution** — Homebrew tap (`brew install tone-labs/tap/ghx`) and GoReleaser
+  prebuilt binaries on each release both shipped. Optional later polish: Homebrew
+  *bottles* (formula consumes the prebuilt binaries) — needs a cross-repo token, low value.
