@@ -193,14 +193,18 @@ the whole point of the command.
 
 ## Install
 
-```
-go install github.com/tone-labs/ghx@latest   # lands in $GOBIN / $HOME/go/bin
+```sh
+brew install tone-labs/tap/ghx                # Homebrew (macOS / Linux)
+# or
+go install github.com/tone-labs/ghx@latest    # needs the Go toolchain; lands in $GOBIN / $HOME/go/bin
 # or
 go build -o ghx . && mv ghx ~/.local/bin/
 ```
 
-Installing currently needs the Go toolchain; prebuilt binaries and a Homebrew tap
-are on the [roadmap](docs/roadmap.md).
+The [Homebrew tap](https://github.com/tone-labs/homebrew-tap) builds from source
+(no macOS notarization prompt) and pulls in `gh` automatically; `brew install
+--HEAD tone-labs/tap/ghx` tracks `main`. The `go` paths need the Go toolchain.
+Prebuilt release binaries are still on the [roadmap](docs/roadmap.md).
 
 Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
 (`gh auth status`) — `ghx` inherits gh's auth, host, and config via
