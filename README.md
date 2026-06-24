@@ -24,32 +24,7 @@ are a deliberate stable contract; the human-readable views may still evolve._
 `ghx comments` — inline threads with resolution state, reviews, and the review
 decision in one view, threads numbered so you drill in by index:
 
-```text
-#42  Add xpath support
-https://github.com/o/r/pull/42
-CHANGES REQUESTED · 1 unresolved · 2 reviews · open · draft
-
-REVIEWS
-  ✓ ci-bot (bot)  approved  ·  1 day ago
-  ✗ bob  changes requested  ·  1 day ago
-      Needs work
-
-THREADS · 2
-
-  [1] a.ts:72  src
-      bob  ·  1 day ago
-      Why does this return element-not-found?
-    ↳ alice  ·  13 hours ago  ·  author
-      Good catch, fixing.
-
-  [2] b.ts:10  src  (resolved, outdated)
-      lint-bot (bot)  ·  1 day ago
-      nit: prefer const here for the long explanation that should be truncated in the compact view
-
-CONVERSATION · 1 comment   — --conversation to show
-
-drill in:  ghx comments 42 --thread <n>
-```
+![ghx comments — colored terminal view: a red CHANGES REQUESTED header with unresolved/review counts, a REVIEWS list with green/red approval glyphs, numbered inline threads grouped by file with cyan file:line, a resolved+outdated badge, and a collapsed conversation count](docs/img/ghx-comments.svg)
 
 `ghx gate` — one merge-readiness verdict with blockers called out (exits `8` when
 blocked, so it gates a merge or a CI step):
@@ -82,8 +57,9 @@ FAILING
     https://x/runs/1
 ```
 
-> Output is colored in a terminal (green pass / red fail / yellow pending) and
-> plain when piped; the samples above are the plain form.
+> The `comments` shot above is real terminal color; `gate` and `checks` are
+> shown as plain text here. Color is on in a terminal (green pass / red fail /
+> yellow pending) and off when piped — `--color auto|always|never` overrides.
 
 ## Commands
 
