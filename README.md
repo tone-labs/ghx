@@ -8,6 +8,78 @@ decision gate**, and **PR-level conversation** together. You end up digging
 through `gh api` JSON. `ghx` fills that gap with a readable terminal view and a
 stable `--json` contract for tooling.
 
+> **Why ghx?** The terminal-native, "never open the PR page again" pitch — who
+> it's for and the bet behind it — lives in [the vision](docs/vision.md).
+
+_Status: pre-1.0 and actively developed. The `--json` structure and exit codes
+are a deliberate stable contract; the human-readable views may still evolve._
+
+## What it looks like
+
+`ghx comments` — inline threads with resolution state, reviews, and the review
+decision in one view, threads numbered so you drill in by index:
+
+```text
+#42  Add xpath support
+https://github.com/o/r/pull/42
+CHANGES REQUESTED · 1 unresolved · 2 reviews · open · draft
+
+REVIEWS
+  ✓ ci-bot (bot)  approved  ·  1 day ago
+  ✗ bob  changes requested  ·  1 day ago
+      Needs work
+
+THREADS · 2
+
+  [1] a.ts:72  src
+      bob  ·  1 day ago
+      Why does this return element-not-found?
+    ↳ alice  ·  13 hours ago  ·  author
+      Good catch, fixing.
+
+  [2] b.ts:10  src  (resolved, outdated)
+      lint-bot (bot)  ·  1 day ago
+      nit: prefer const here for the long explanation that should be truncated in the compact view
+
+CONVERSATION · 1 comment   — --conversation to show
+
+drill in:  ghx comments 42 --thread <n>
+```
+
+`ghx gate` — one merge-readiness verdict with blockers called out (exits `8` when
+blocked, so it gates a merge or a CI step):
+
+```text
+#42  Add xpath support
+https://github.com/o/r/pull/42
+✗ BLOCKED  ·  2 blockers
+merge state: blocked
+
+  ✗ review   changes requested
+  ○ threads  2 threads unresolved
+  ✗ checks   1 check failing
+
+  ○ = advisory: related to the merge, but not blocking it
+```
+
+`ghx checks` — the CI rollup as colored bucket counts (failures first) with
+workflow links:
+
+```text
+checks  PR #42  ·  6 checks
+
+  ✗ 1 fail
+  ○ 2 pending
+  ✓ 3 pass
+
+FAILING
+  ✗ lint  CI
+    https://x/runs/1
+```
+
+> Output is colored in a terminal (green pass / red fail / yellow pending) and
+> plain when piped; the samples above are the plain form.
+
 ## Commands
 
 ```
@@ -127,10 +199,14 @@ go install github.com/tone-labs/ghx@latest   # lands in $GOBIN / $HOME/go/bin
 go build -o ghx . && mv ghx ~/.local/bin/
 ```
 
+Installing currently needs the Go toolchain; prebuilt binaries and a Homebrew tap
+are on the [roadmap](docs/roadmap.md).
+
 Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
 (`gh auth status`) — `ghx` inherits gh's auth, host, and config via
-[`go-gh`](https://github.com/cli/go-gh), so it works as a standalone binary
-(not only as a gh extension).
+[`go-gh`](https://github.com/cli/go-gh). It is **not** a `gh` extension: it's a
+standalone binary that reuses gh's auth, so there's nothing to `gh extension
+install`.
 
 ## Design
 
