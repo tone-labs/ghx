@@ -1,5 +1,10 @@
 # ghx
 
+[![ci](https://github.com/tone-labs/ghx/actions/workflows/ci.yml/badge.svg)](https://github.com/tone-labs/ghx/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/tone-labs/ghx)](https://github.com/tone-labs/ghx/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tone-labs/ghx)](https://goreportcard.com/report/github.com/tone-labs/ghx)
+[![license](https://img.shields.io/github/license/tone-labs/ghx)](LICENSE)
+
 `gh` extras — the pull-request review views the GitHub CLI leaves out.
 
 `gh pr checks` is great for CI state at a glance, but `gh` has no first-class
