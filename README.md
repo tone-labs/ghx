@@ -61,6 +61,30 @@ FAILING
 > shown as plain text here. Color is on in a terminal (green pass / red fail /
 > yellow pending) and off when piped; `--color auto|always|never` overrides.
 
+## Install
+
+```sh
+brew install tone-labs/tap/ghx                # Homebrew (macOS / Linux)
+# or
+go install github.com/tone-labs/ghx@latest    # needs the Go toolchain; lands in $GOBIN / $HOME/go/bin
+# or
+go build -o ghx . && mv ghx ~/.local/bin/
+```
+
+Prefer a binary? Prebuilt archives for macOS and Linux (amd64/arm64), with
+checksums, are attached to every
+[release](https://github.com/tone-labs/ghx/releases/latest).
+
+The [Homebrew tap](https://github.com/tone-labs/homebrew-tap) builds from source
+(no macOS notarization prompt) and pulls in `gh` automatically; `brew install
+--HEAD tone-labs/tap/ghx` tracks `main`. The `go` paths need the Go toolchain.
+
+Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
+(`gh auth status`); `ghx` inherits gh's auth, host, and config via
+[`go-gh`](https://github.com/cli/go-gh). It is **not** a `gh` extension: it's a
+standalone binary that reuses gh's auth, so there's nothing to `gh extension
+install`.
+
 ## Commands
 
 ```
@@ -171,30 +195,6 @@ usage/flag error. With `--exit-code`, `ghx checks` additionally returns `8` (the
 CI gates and automation can branch on status without parsing JSON. `ghx
 gate` returns `8` when the PR is blocked; no flag needed, since the verdict is
 the whole point of the command.
-
-## Install
-
-```sh
-brew install tone-labs/tap/ghx                # Homebrew (macOS / Linux)
-# or
-go install github.com/tone-labs/ghx@latest    # needs the Go toolchain; lands in $GOBIN / $HOME/go/bin
-# or
-go build -o ghx . && mv ghx ~/.local/bin/
-```
-
-Prefer a binary? Prebuilt archives for macOS and Linux (amd64/arm64), with
-checksums, are attached to every
-[release](https://github.com/tone-labs/ghx/releases/latest).
-
-The [Homebrew tap](https://github.com/tone-labs/homebrew-tap) builds from source
-(no macOS notarization prompt) and pulls in `gh` automatically; `brew install
---HEAD tone-labs/tap/ghx` tracks `main`. The `go` paths need the Go toolchain.
-
-Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
-(`gh auth status`); `ghx` inherits gh's auth, host, and config via
-[`go-gh`](https://github.com/cli/go-gh). It is **not** a `gh` extension: it's a
-standalone binary that reuses gh's auth, so there's nothing to `gh extension
-install`.
 
 ## Design
 
