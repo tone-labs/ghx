@@ -13,8 +13,8 @@ decision gate**, and **PR-level conversation** together. You end up digging
 through `gh api` JSON. `ghx` fills that gap with a readable terminal view and a
 stable `--json` contract for tooling.
 
-> **Why ghx?** The terminal-native, "never open the PR page again" pitch — who
-> it's for and the bet behind it — lives in [the vision](docs/vision.md).
+> **Why ghx?** The terminal-native "never open the PR page again" pitch (who
+> it's for, and the bet behind it) lives in [the vision](docs/vision.md).
 
 _Status: pre-1.0 and actively developed. The `--json` structure and exit codes
 are a deliberate stable contract; the human-readable views may still evolve._
@@ -24,7 +24,7 @@ are a deliberate stable contract; the human-readable views may still evolve._
 `ghx comments` — inline threads with resolution state, reviews, and the review
 decision in one view, threads numbered so you drill in by index:
 
-![ghx comments — colored terminal view: a red CHANGES REQUESTED header with unresolved/review counts, a REVIEWS list with green/red approval glyphs, numbered inline threads grouped by file with cyan file:line, a resolved+outdated badge, and a collapsed conversation count](docs/img/ghx-comments.svg)
+![ghx comments, colored terminal view: a red CHANGES REQUESTED header with unresolved/review counts, a REVIEWS list with green/red approval glyphs, numbered inline threads grouped by file with cyan file:line, a resolved+outdated badge, and a collapsed conversation count](docs/img/ghx-comments.svg)
 
 `ghx gate` — one merge-readiness verdict with blockers called out (exits `8` when
 blocked, so it gates a merge or a CI step):
@@ -59,7 +59,7 @@ FAILING
 
 > The `comments` shot above is real terminal color; `gate` and `checks` are
 > shown as plain text here. Color is on in a terminal (green pass / red fail /
-> yellow pending) and off when piped — `--color auto|always|never` overrides.
+> yellow pending) and off when piped; `--color auto|always|never` overrides.
 
 ## Commands
 
@@ -95,16 +95,16 @@ ghx comments --json          # machine-readable (full bodies)
 ```
 
 The default view leads with the **decision** and unresolved count, lists
-**reviews** (✓/✗ glyphs), then **numbered inline threads** grouped by file —
-basename and line in front, directory elided behind. Bodies wrap to the full
+**reviews** (✓/✗ glyphs), then **numbered inline threads** grouped by file
+(basename and line in front, directory elided behind). Bodies wrap to the full
 terminal width (measured at run time, like `gh pr checks`; `--width N` to
 override) and are capped at 2 lines (`--lines N`). Threads are numbered so you
 drill in by index (`--thread N`) rather than copying a node id. Only
 **unresolved** threads show by default (`--all` adds resolved, badged) while
-**outdated** threads show until you `--hide-outdated` — the asymmetry is
+**outdated** threads show until you `--hide-outdated`. The asymmetry is
 deliberate: resolved means *done*, outdated means *the code moved but the note
 may still matter*. The **conversation** collapses to a one-line count
-(`--conversation` to expand) — that's where bot noise lives. Color is on for a
+(`--conversation` to expand). That's where bot noise lives. Color is on for a
 terminal and off when piped; `--color auto|always|never` overrides that, and
 `NO_COLOR` is honored.
 
@@ -117,7 +117,7 @@ ghx checks --exit-code    # exit 8 if any check is failing (for CI/scripts)
 ```
 
 Reuses `gh`'s own status-check rollup (no reimplementation), reshaped into
-**colored bucket counts** (failures first — green pass / red fail / yellow
+**colored bucket counts** (failures first: green pass / red fail / yellow
 pending) and failing-check detail with workflow links. Color follows the same
 rules as `comments` (`--color auto|always|never`, `NO_COLOR` honored).
 
@@ -129,15 +129,15 @@ ghx gate 1667 --json      # structured verdict
 ghx gate && gh pr merge   # gate before merging
 ```
 
-Anchors on GitHub's own merge-button state (`mergeStateStatus`) — which already
-accounts for **branch protection**, **required reviews**, and **required** checks
-— then explains it with the finer signals (review decision, unresolved threads,
+Anchors on GitHub's own merge-button state (`mergeStateStatus`), which already
+accounts for **branch protection**, **required reviews**, and **required** checks,
+then explains it with the finer signals (review decision, unresolved threads,
 CI checks) as a `MERGEABLE` / `BLOCKED` verdict with blockers listed. Because the
 anchor is the merge button itself, the verdict agrees with it: a red *non-required*
 check (GitHub's `UNSTABLE`) doesn't block, a merge conflict or out-of-date branch
 does. When GitHub hasn't computed a state yet it falls back to a best-effort union
-of the finer signals. Exits `8` when blocked (no flag needed — the verdict is the
-command's purpose), so it gates a merge or a CI step.
+of the finer signals. Exits `8` when blocked (no flag needed, since the verdict
+is the command's purpose), so it gates a merge or a CI step.
 
 ### `ghx resolve` / `ghx unresolve`
 
@@ -148,17 +148,17 @@ ghx unresolve                # list resolved threads, numbered
 ghx unresolve --thread 1     # reopen thread #1
 ```
 
-Toggle a review thread's resolution state by its **listing number** — the same
-`N` that `ghx comments` shows by default — so you never copy a node id. Each verb acts on the
+Toggle a review thread's resolution state by its **listing number** (the same
+`N` that `ghx comments` shows by default), so you never copy a node id. Each verb acts on the
 threads it can: `resolve` numbers the *unresolved* threads, `unresolve` the
 *resolved* ones. With no `--thread`, it lists those targets (a one-line preview
 each) so you can pick; with `--thread N` it toggles the Nth. These are the first
-*write* verbs in ghx — explicit, single-thread, no bulk flag.
+*write* verbs in ghx: explicit, single-thread, no bulk flag.
 
 ## Scripting
 
 `--json` is a boolean toggle that emits the full normalized structure (unlike
-`gh`'s `--json <fields>` form) — a stable contract you pipe to `jq`:
+`gh`'s `--json <fields>` form), a stable contract you pipe to `jq`:
 
 ```
 ghx comments --json | jq -r '.threads[] | select(.isResolved | not) | .path'
@@ -167,9 +167,9 @@ ghx checks  --json | jq -r '.failing[] | "\(.name)\t\(.link)"'
 
 Exit codes: `0` success, `1` runtime error (no PR found, `gh` failure), `2`
 usage/flag error. With `--exit-code`, `ghx checks` additionally returns `8` (the
-`gh pr checks` convention — distinct from `1`/`2`) when any check is failing, so
+`gh pr checks` convention, distinct from `1`/`2`) when any check is failing, so
 CI gates and automation can branch on status without parsing JSON. `ghx
-gate` returns `8` when the PR is blocked — no flag needed, since the verdict is
+gate` returns `8` when the PR is blocked; no flag needed, since the verdict is
 the whole point of the command.
 
 ## Install
@@ -191,7 +191,7 @@ The [Homebrew tap](https://github.com/tone-labs/homebrew-tap) builds from source
 --HEAD tone-labs/tap/ghx` tracks `main`. The `go` paths need the Go toolchain.
 
 Requires the [`gh`](https://cli.github.com) CLI installed and authenticated
-(`gh auth status`) — `ghx` inherits gh's auth, host, and config via
+(`gh auth status`); `ghx` inherits gh's auth, host, and config via
 [`go-gh`](https://github.com/cli/go-gh). It is **not** a `gh` extension: it's a
 standalone binary that reuses gh's auth, so there's nothing to `gh extension
 install`.
@@ -199,7 +199,7 @@ install`.
 ## Design
 
 Data flows through a normalized model (`internal/model`) that data sources fill
-via a provider seam (`internal/provider`) — today a single GraphQL query owns
+via a provider seam (`internal/provider`). Today a single GraphQL query owns
 the read path; swapping or augmenting sources is contained to that package.
 Rendering (`internal/render`) offers a human view and a JSON view; the JSON
 schema is the stable contract for downstream tooling.
