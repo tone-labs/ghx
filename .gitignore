@@ -16,3 +16,7 @@
 # single uncommitted file feeds both Claude Code and other agents.
 AGENTS.local.md
 CLAUDE.local.md
+
+# Internal Linear routing (workspace/team). Kept local so the Linear CLI works;
+# untracked so it doesn't ship in the public repo.
+.linear.toml

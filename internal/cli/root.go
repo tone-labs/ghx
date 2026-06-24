@@ -7,12 +7,31 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 )
 
-// Version is the build version, overridable via -ldflags at release time.
+// Version is the build version. Defaults to "dev"; an explicit -ldflags override
+// at release time wins, otherwise version() fills it from the module version Go
+// embeds into `go install module@vX.Y.Z` builds.
 var Version = "dev"
+
+// version resolves the string shown by `--version` / `ghx version`. Precedence:
+// an explicit -ldflags override of Version; then the module version Go embeds in
+// binaries built via `go install ...@vX.Y.Z` (so a tagged install self-reports
+// its tag); then "dev" for a plain `go build` from a checkout.
+func version() string {
+	if Version != "dev" {
+		return Version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if v := info.Main.Version; v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return Version
+}
 
 // cmdError marks a runtime failure (as opposed to a flag/usage error) returned
 // from a command's RunE, so Execute can print it in ghx's "ghx: <msg>" form and
@@ -71,7 +90,7 @@ func newRootCmd() *cobra.Command {
 			"Inline review threads (with resolution state), the review-decision\n" +
 			"gate, PR-level conversation, and the CI status-check rollup. With no\n" +
 			"PR argument, ghx operates on the open PR for the current branch.",
-		Version:       Version,
+		Version:       version(),
 		SilenceErrors: true, // Execute() owns error printing ("ghx: <msg>")
 		// SilenceUsage stays false so flag/arg errors still show usage; each
 		// RunE flips it true after parsing so runtime failures don't dump usage.
@@ -91,7 +110,7 @@ func newVersionCmd() *cobra.Command {
 		Short: "Print the ghx version",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "ghx %s\n", Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "ghx %s\n", version())
 		},
 	}
 }
